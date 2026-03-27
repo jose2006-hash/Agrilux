@@ -1,13 +1,15 @@
 import React, { useState, useRef } from 'react';
-import { Camera, Loader2, AlertTriangle, CheckCircle, Send, Mic, MicOff, Volume2, VolumeX, ShoppingCart } from 'lucide-react';
+import { Camera, Loader2, AlertTriangle, CheckCircle, Send,
+         Mic, MicOff, Volume2, VolumeX, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { invokeGemini } from '../lib/gemini';
-import { CULTIVOS, WHATSAPP } from '../lib/constants';
+import { CULTIVOS } from '../lib/constants';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
-const SINTOMAS = ['Manchas', 'Hojas enrolladas', 'Plagas visibles', 'Pudrición', 'Amarillamiento', 'Marchitez', 'Tallos débiles', 'Frutos dañados'];
+const SINTOMAS = ['Manchas', 'Hojas enrolladas', 'Plagas visibles', 'Pudrición',
+                  'Amarillamiento', 'Marchitez', 'Tallos débiles', 'Frutos dañados'];
 
 export default function Diagnostico() {
   const { user } = useAuth();
@@ -17,6 +19,7 @@ export default function Diagnostico() {
   const [sintomas, setSintomas] = useState([]);
   const [ubicacion, setUbicacion] = useState(user?.ubicacion || '');
   const [descripcion, setDescripcion] = useState('');
+  const [mostrarOpciones, setMostrarOpciones] = useState(false); // ← nuevo
   const [analizando, setAnalizando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [chat, setChat] = useState([]);
@@ -28,18 +31,19 @@ export default function Diagnostico() {
   const chatRef = useRef(null);
   const reconRef = useRef(null);
 
-  const toggleSintoma = (s) => setSintomas(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+  const toggleSintoma = (s) =>
+    setSintomas(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
 
   const handleFoto = (e) => {
     const files = Array.from(e.target.files);
     files.forEach(file => {
       const reader = new FileReader();
-      reader.onload = () => setFotos(prev => [...prev, { preview: reader.result, dataUrl: reader.result }]);
+      reader.onload = () =>
+        setFotos(prev => [...prev, { preview: reader.result, dataUrl: reader.result }]);
       reader.readAsDataURL(file);
     });
   };
 
-  // Compress image
   const compressDataUrl = (dataUrl) => new Promise(resolve => {
     const img = new Image();
     img.onload = () => {
@@ -60,7 +64,6 @@ export default function Diagnostico() {
     setAnalizando(true);
     try {
       const compressedUrls = await Promise.all(fotos.map(f => compressDataUrl(f.dataUrl)));
-
       const analisis = await invokeGemini({
         prompt: `Eres un agrónomo experto en cultivos del Perú. Analiza esta imagen de ${cultivo.nombre} y da un diagnóstico claro y sencillo para un agricultor.
 
@@ -70,7 +73,7 @@ Datos:
 - Síntomas reportados: ${sintomas.join(', ') || 'No especificados'}
 - Descripción del agricultor: ${descripcion || 'Sin descripción'}
 
-IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos complejos. El agricultor debe entender fácilmente qué tiene su cultivo y qué hacer.`,
+IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos complejos.`,
         file_urls: compressedUrls,
         response_json_schema: {
           type: 'object',
@@ -80,7 +83,13 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
             gravedad: { type: 'string', enum: ['ninguna', 'leve', 'moderada', 'grave'] },
             que_tiene: { type: 'string' },
             que_hacer: { type: 'string' },
-            productos: { type: 'array', items: { type: 'object', properties: { nombre: { type: 'string' }, dosis: { type: 'string' } } } },
+            productos: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: { nombre: { type: 'string' }, dosis: { type: 'string' } }
+              }
+            },
             prevencion: { type: 'string' },
           }
         }
@@ -88,7 +97,6 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
 
       setResultado(analisis);
 
-      // Guardar en Firebase
       try {
         await addDoc(collection(db, 'diagnosticos'), {
           userId: user?.id,
@@ -100,8 +108,9 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
         });
       } catch (e) { console.log('Firebase save error', e); }
 
-      // Leer resultado
-      leerTexto(`${analisis.tiene_problema ? `Tu ${cultivo.nombre} tiene ${analisis.nombre_problema}. ${analisis.que_hacer}` : `Tu ${cultivo.nombre} está saludable.`}`);
+      leerTexto(`${analisis.tiene_problema
+        ? `Tu ${cultivo.nombre} tiene ${analisis.nombre_problema}. ${analisis.que_hacer}`
+        : `Tu ${cultivo.nombre} está saludable.`}`);
     } catch (e) {
       console.error(e);
       setResultado({ error: true });
@@ -123,7 +132,9 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
   const detenerVoz = () => { window.speechSynthesis?.cancel(); setLeyendo(false); };
 
   const grabarVoz = () => {
-    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) { alert('Tu navegador no soporta voz. Usa Chrome.'); return; }
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Tu navegador no soporta voz. Usa Chrome.'); return;
+    }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     const r = new SR();
     r.lang = 'es-PE'; r.continuous = false;
@@ -141,7 +152,8 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
     setChat(prev => [...prev, { role: 'user', text: p }]);
     setEnviando(true);
     try {
-      const historial = chat.map(m => `${m.role === 'user' ? 'Agricultor' : 'Asistente'}: ${m.text}`).join('\n');
+      const historial = chat.map(m =>
+        `${m.role === 'user' ? 'Agricultor' : 'Asistente'}: ${m.text}`).join('\n');
       const resp = await invokeGemini({
         prompt: `Eres un agrónomo experto. El agricultor tiene un ${cultivo.nombre} con ${resultado?.nombre_problema || 'cultivo saludable'}.
 
@@ -149,7 +161,7 @@ Historial: ${historial}
 
 Pregunta actual: ${p}
 
-Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita insumos, menciona que puede encontrarlos en la sección de Mercado.`
+Responde de forma clara, breve y en lenguaje simple. Si necesita insumos, menciona que puede encontrarlos en la sección de Mercado.`
       });
       setChat(prev => [...prev, { role: 'ia', text: resp }]);
       leerTexto(resp);
@@ -160,16 +172,23 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
     setEnviando(false);
   };
 
-  const irAInsumos = () => navigate('/mercado');
-
+  // ─── PANTALLA DE RESULTADO ───────────────────────────────────────────────────
   if (resultado && !resultado.error) return (
     <div className="min-h-screen pb-24 animate-fadeIn">
-      <div className={`px-6 pt-12 pb-6 ${resultado.gravedad === 'grave' ? 'bg-red-600' : resultado.gravedad === 'moderada' ? 'bg-orange-500' : resultado.tiene_problema ? 'bg-yellow-500' : 'bg-primary'} text-white`}>
-        <button onClick={() => setResultado(null)} className="text-white/70 text-sm mb-3">← Nuevo diagnóstico</button>
+      <div className={`px-6 pt-12 pb-6 ${
+        resultado.gravedad === 'grave' ? 'bg-red-600' :
+        resultado.gravedad === 'moderada' ? 'bg-orange-500' :
+        resultado.tiene_problema ? 'bg-yellow-500' : 'bg-primary'
+      } text-white`}>
+        <button onClick={() => setResultado(null)} className="text-white/70 text-sm mb-3">
+          ← Nuevo diagnóstico
+        </button>
         <div className="flex items-center gap-3">
           {resultado.tiene_problema ? <AlertTriangle size={28} /> : <CheckCircle size={28} />}
           <div>
-            <h1 className="text-xl font-display font-bold">{resultado.tiene_problema ? resultado.nombre_problema : '✓ Cultivo Saludable'}</h1>
+            <h1 className="text-xl font-display font-bold">
+              {resultado.tiene_problema ? resultado.nombre_problema : '✓ Cultivo Saludable'}
+            </h1>
             <p className="text-white/80 text-sm">{cultivo.emoji} {cultivo.nombre}</p>
           </div>
         </div>
@@ -177,20 +196,26 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
 
       <div className="px-4 py-4 space-y-4">
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">¿Qué tiene tu cultivo?</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+            ¿Qué tiene tu cultivo?
+          </p>
           <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_tiene}</p>
         </div>
 
         {resultado.tiene_problema && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">¿Qué debes hacer?</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              ¿Qué debes hacer?
+            </p>
             <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_hacer}</p>
           </div>
         )}
 
         {resultado.productos?.length > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Productos recomendados</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+              Productos recomendados
+            </p>
             <div className="space-y-2">
               {resultado.productos.map((p, i) => (
                 <div key={i} className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
@@ -198,7 +223,8 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
                     <p className="font-semibold text-sm text-gray-800">{p.nombre}</p>
                     <p className="text-xs text-gray-500">{p.dosis}</p>
                   </div>
-                  <button onClick={irAInsumos} className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+                  <button onClick={() => navigate('/mercado')}
+                    className="bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg">
                     Ver en tienda
                   </button>
                 </div>
@@ -209,15 +235,17 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
 
         {resultado.prevencion && (
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
-            <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-2">🛡️ Prevención</p>
+            <p className="text-xs font-bold text-green-700 uppercase tracking-wide mb-2">
+              🛡️ Prevención
+            </p>
             <p className="text-green-800 text-sm">{resultado.prevencion}</p>
           </div>
         )}
 
-        {/* Audio controls */}
         <div className="flex gap-2">
           {leyendo ? (
-            <button onClick={detenerVoz} className="flex-1 flex items-center justify-center gap-2 bg-red-100 text-red-600 font-bold py-3 rounded-xl text-sm">
+            <button onClick={detenerVoz}
+              className="flex-1 flex items-center justify-center gap-2 bg-red-100 text-red-600 font-bold py-3 rounded-xl text-sm">
               <VolumeX size={16} /> Detener audio
             </button>
           ) : (
@@ -230,14 +258,16 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
 
         {/* Chat */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">💬 Consulta más sobre tu cultivo</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+            💬 Consulta más sobre tu cultivo
+          </p>
           {chat.length > 0 && (
             <div className="space-y-2 mb-3 max-h-64 overflow-y-auto">
               {chat.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${m.role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'}`}>
-                    {m.text}
-                  </div>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                    m.role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'
+                  }`}>{m.text}</div>
                 </div>
               ))}
               <div ref={chatRef} />
@@ -258,10 +288,27 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
             </button>
           </div>
         </div>
+
+        {/* Explorar más */}
+        <div className="grid grid-cols-2 gap-3 pt-2">
+          <button onClick={() => navigate('/mercado')}
+            className="bg-white rounded-2xl p-4 shadow-sm text-left border border-gray-100 active:scale-95 transition-transform">
+            <span className="text-2xl">🛒</span>
+            <p className="font-bold text-sm text-gray-800 mt-1">Mercado</p>
+            <p className="text-xs text-gray-400">Compra insumos</p>
+          </button>
+          <button onClick={() => navigate('/mi-parcela')}
+            className="bg-white rounded-2xl p-4 shadow-sm text-left border border-gray-100 active:scale-95 transition-transform">
+            <span className="text-2xl">🌱</span>
+            <p className="font-bold text-sm text-gray-800 mt-1">Mi Parcela</p>
+            <p className="text-xs text-gray-400">Gestiona tus cultivos</p>
+          </button>
+        </div>
       </div>
     </div>
   );
 
+  // ─── PANTALLA DE FORMULARIO ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen pb-24">
       <div className="bg-primary text-white px-6 pt-12 pb-6">
@@ -270,14 +317,19 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
       </div>
 
       <div className="px-4 py-4 space-y-4">
+
         {/* Selección cultivo */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Selecciona tu cultivo</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+            Selecciona tu cultivo
+          </p>
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
             {CULTIVOS.map(c => (
               <button key={c.id} onClick={() => setCultivo(c)}
                 className={`flex-shrink-0 flex flex-col items-center gap-1 px-4 py-3 rounded-xl transition-all ${
-                  cultivo.id === c.id ? 'bg-primary text-white shadow-md scale-105' : 'bg-gray-50 text-gray-600 border border-gray-200'
+                  cultivo.id === c.id
+                    ? 'bg-primary text-white shadow-md scale-105'
+                    : 'bg-gray-50 text-gray-600 border border-gray-200'
                 }`}>
                 <span className="text-2xl">{c.emoji}</span>
                 <span className="text-xs font-semibold">{c.nombre}</span>
@@ -288,7 +340,9 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
 
         {/* Fotos */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Fotos del cultivo</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+            Fotos del cultivo
+          </p>
           {fotos.length === 0 ? (
             <div onClick={() => fileRef.current?.click()}
               className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center cursor-pointer hover:border-primary transition-colors">
@@ -297,59 +351,82 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
               <p className="text-xs text-gray-400">Fotos claras de hojas o plantas afectadas</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                {fotos.map((f, i) => (
-                  <div key={i} className="relative">
-                    <img src={f.preview} alt="" className="w-full h-24 object-cover rounded-xl" />
-                    <button onClick={() => setFotos(prev => prev.filter((_, j) => j !== i))}
-                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">×</button>
-                  </div>
-                ))}
-                <button onClick={() => fileRef.current?.click()}
-                  className="h-24 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 hover:border-primary transition-colors">
-                  <Camera size={20} />
-                </button>
-              </div>
+            <div className="grid grid-cols-3 gap-2">
+              {fotos.map((f, i) => (
+                <div key={i} className="relative">
+                  <img src={f.preview} alt="" className="w-full h-24 object-cover rounded-xl" />
+                  <button onClick={() => setFotos(prev => prev.filter((_, j) => j !== i))}
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                    ×
+                  </button>
+                </div>
+              ))}
+              <button onClick={() => fileRef.current?.click()}
+                className="h-24 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center text-gray-400 hover:border-primary transition-colors">
+                <Camera size={20} />
+              </button>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="image/*" multiple capture="environment" onChange={handleFoto} className="hidden" />
+          <input ref={fileRef} type="file" accept="image/*" multiple capture="environment"
+            onChange={handleFoto} className="hidden" />
         </div>
 
-        {/* Síntomas */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Síntomas observados</p>
-          <div className="flex flex-wrap gap-2">
-            {SINTOMAS.map(s => (
-              <button key={s} onClick={() => toggleSintoma(s)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                  sintomas.includes(s) ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 border border-gray-200'
-                }`}>{s}</button>
-            ))}
-          </div>
-        </div>
+        {/* Opciones adicionales (colapsables) */}
+        <button onClick={() => setMostrarOpciones(v => !v)}
+          className="w-full flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm text-sm text-gray-500 font-semibold">
+          <span>➕ Agregar más detalles (opcional)</span>
+          {mostrarOpciones ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+        </button>
 
-        {/* Ubicación y descripción */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Ubicación</label>
-            <input value={ubicacion} onChange={e => setUbicacion(e.target.value)}
-              placeholder="Ej: Cutervo, Cajamarca"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary" />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Descripción (opcional)</label>
-            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)}
-              placeholder="Describe lo que observas..." rows={2}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary resize-none" />
-          </div>
-        </div>
+        {mostrarOpciones && (
+          <div className="space-y-4 animate-fadeIn">
+            {/* Síntomas */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+                Síntomas observados
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {SINTOMAS.map(s => (
+                  <button key={s} onClick={() => toggleSintoma(s)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                      sintomas.includes(s)
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 text-gray-600 border border-gray-200'
+                    }`}>{s}</button>
+                ))}
+              </div>
+            </div>
 
+            {/* Ubicación y descripción */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">
+                  Ubicación
+                </label>
+                <input value={ubicacion} onChange={e => setUbicacion(e.target.value)}
+                  placeholder="Ej: Cutervo, Cajamarca"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary" />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">
+                  Descripción
+                </label>
+                <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)}
+                  placeholder="Describe lo que observas..." rows={2}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary resize-none" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Botón principal */}
         <button onClick={analizar} disabled={fotos.length === 0 || analizando}
           className="w-full bg-primary text-white font-bold py-4 rounded-2xl hover:bg-primary-dark transition-colors disabled:opacity-50 text-base">
-          {analizando ? (
-            <span className="flex items-center justify-center gap-2"><Loader2 size={20} className="animate-spin" /> Analizando con IA...</span>
-          ) : '🔬 Iniciar Diagnóstico'}
+          {analizando
+            ? <span className="flex items-center justify-center gap-2">
+                <Loader2 size={20} className="animate-spin" /> Analizando con IA...
+              </span>
+            : '🔬 Iniciar Diagnóstico'}
         </button>
 
         {resultado?.error && (
@@ -359,6 +436,31 @@ Responde de forma clara, breve y en lenguaje simple. Si el agricultor necesita i
             <p className="text-red-400 text-xs mt-1">Intenta con una foto más clara</p>
           </div>
         )}
+
+        {/* Explorar más */}
+        <div className="pt-2">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 text-center">
+            Explorar más
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <button onClick={() => navigate('/mercado')}
+              className="bg-white rounded-2xl p-3 shadow-sm text-center border border-gray-100 active:scale-95 transition-transform">
+              <span className="text-xl">🛒</span>
+              <p className="font-semibold text-xs text-gray-700 mt-1">Mercado</p>
+            </button>
+            <button onClick={() => navigate('/mi-parcela')}
+              className="bg-white rounded-2xl p-3 shadow-sm text-center border border-gray-100 active:scale-95 transition-transform">
+              <span className="text-xl">🌱</span>
+              <p className="font-semibold text-xs text-gray-700 mt-1">Mi Parcela</p>
+            </button>
+            <button onClick={() => navigate('/comunidad')}
+              className="bg-white rounded-2xl p-3 shadow-sm text-center border border-gray-100 active:scale-95 transition-transform">
+              <span className="text-xl">👥</span>
+              <p className="font-semibold text-xs text-gray-700 mt-1">Comunidad</p>
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   );

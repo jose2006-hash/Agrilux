@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function Registro() {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [nombre, setNombre] = useState('');
 
   const handleEntrar = () => {
@@ -15,14 +17,13 @@ export default function Registro() {
       whatsapp: '',
     };
     login(user);
+    navigate('/diagnostico'); // ← único cambio
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6"
       style={{ background: 'linear-gradient(160deg, #f0faf4 0%, #e8f5ee 100%)' }}>
       <div className="w-full max-w-sm">
-
-        {/* Logo */}
         <div className="text-center mb-10">
           <div className="w-24 h-24 bg-primary rounded-3xl flex items-center justify-center mx-auto mb-5 shadow-xl">
             <span className="text-5xl">🌾</span>
@@ -31,7 +32,6 @@ export default function Registro() {
           <p className="text-gray-500 mt-2">Agricultura Inteligente del Perú</p>
         </div>
 
-        {/* Formulario mínimo */}
         <div className="bg-white rounded-3xl shadow-xl p-8">
           <h2 className="text-lg font-bold text-gray-800 mb-1">¿Cómo te llamas?</h2>
           <p className="text-sm text-gray-400 mb-6">Solo necesitamos tu nombre para comenzar</p>
@@ -61,4 +61,3 @@ export default function Registro() {
     </div>
   );
 }
-
