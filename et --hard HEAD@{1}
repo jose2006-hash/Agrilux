@@ -1,0 +1,34 @@
+[33m4b47cb3[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m Update App.jsx
+[33m5a876cd[m Update Diagnostico.jsx
+[33mc8edd70[m Delete src/components/Layout.jsx
+[33me048993[m Remove import of Layout component from App.jsx
+[33m687dfd3[m Fix import path for Layout component
+[33ma291809[m Update import path for Layout component
+[33md1589e1[m Format Layout component for better readability
+[33mc9d46cb[m Update Layout.jsx
+[33m70295ac[m Refactor Layout component to simplify structure
+[33m1973961[m Update Layout.jsx
+[33m0b6fc6c[m Remove duplicate import of Layout component
+[33m1a05fea[m Import Layout component in App.jsx
+[33md30b5b5[m Remove import statement for SaludFinanciera
+[33mab551b9[m Remove Admin import from Diagnostico.jsx
+[33m5a53eb2[m Update Diagnostico.jsx
+[33mf504c9c[m Update Diagnostico.jsx
+[33ma2f07ac[m Fix import path for Mercado component
+[33mb98fbf3[m Update Diagnostico.jsx
+[33mfc53f90[m Update import from useAuth to AuthProvider
+[33m64b83f4[m Refactor import statement for AuthContext
+[33m4865886[m Remove unused imports in Diagnostico.jsx
+[33m632dd24[m Remove unnecessary blank lines in App.jsx
+[33md64ec67[m Update App.jsx
+[33mea0c12a[m Update Diagnostico.jsx
+[33m7556d60[m Update App.jsx
+[33m86f961d[m Update Diagnostico.jsx
+[33m3d8218a[m Fix missing newline at end of App.jsx
+[33m68ff5c0[m Wrap App component with AuthProvider
+[33m6637197[m Wrap App component with AuthProvider
+[33m6b18b80[m Update Diagnostico.jsx
+[33mf30b195[m Refactor AuthContext to use default user
+[33m71b9719[m Refactor Diagnostico into App with routing
+[33ma07459d[m Update App.jsx
+[33m752fd66[m agrilux limpio
