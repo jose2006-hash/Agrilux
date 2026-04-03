@@ -367,8 +367,7 @@ Responde de forma clara, breve y en lenguaje simple. Si necesita insumos, mencio
               </button>
             </div>
           )}
-          <input ref={fileRef} type="file" accept="image/*" multiple capture="environment"
-            onChange={handleFoto} className="hidden" />
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFoto} className="hidden" />
         </div>
 
         {/* Opciones adicionales (colapsables) */}
