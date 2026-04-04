@@ -1,57 +1,45 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { db } from './firebase';
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [marketUser, setMarketUser] = useState(null); // solo para marketplace
 
   useEffect(() => {
-    const stored = localStorage.getItem('agrilux_user');
-    if (stored) setUser(JSON.parse(stored));
-    setLoading(false);
+    const stored = localStorage.getItem('agrilux_market_user');
+    if (stored) setMarketUser(JSON.parse(stored));
   }, []);
 
-  const login = (userData) => {
-    localStorage.setItem('agrilux_user', JSON.stringify(userData));
-    setUser(userData);
-  };
-
-  const logout = () => {
-    localStorage.removeItem('agrilux_user');
-    setUser(null);
-  };
-
-  const registerUser = async (data) => {
-    // Guardar en Firebase
-    const docRef = await addDoc(collection(db, 'usuarios'), {
+  // Registrar usuario del marketplace (agricultor o proveedor)
+  const registerMarketUser = async (data) => {
+    const docRef = await addDoc(collection(db, 'usuariosMercado'), {
       ...data,
       createdAt: new Date().toISOString(),
-      tipo: data.tipo || 'agricultor',
     });
     const userData = { id: docRef.id, ...data };
-    login(userData);
+    localStorage.setItem('agrilux_market_user', JSON.stringify(userData));
+    setMarketUser(userData);
     return userData;
   };
 
-  const loginWithCode = async (whatsapp, code) => {
-    // Buscar usuario por whatsapp y código
-    const q = query(
-      collection(db, 'usuarios'),
-      where('whatsapp', '==', whatsapp),
-      where('codigo', '==', code)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) throw new Error('Código incorrecto o número no registrado');
-    const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
-    login(userData);
-    return userData;
+  const logoutMarket = () => {
+    localStorage.removeItem('agrilux_market_user');
+    setMarketUser(null);
+  };
+
+  // user genérico para diagnóstico (sin registro)
+  const user = {
+    id: 'anonimo',
+    nombre: marketUser?.nombre || 'Agricultor',
+    ubicacion: marketUser?.ubicacion || 'Perú',
+    tipo: marketUser?.tipo || 'agricultor',
+    whatsapp: marketUser?.celular || '',
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, registerUser, loginWithCode }}>
+    <AuthContext.Provider value={{ user, marketUser, registerMarketUser, logoutMarket }}>
       {children}
     </AuthContext.Provider>
   );
