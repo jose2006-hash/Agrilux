@@ -5,18 +5,16 @@ import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [marketUser, setMarketUser] = useState(null); // solo para marketplace
+  const [marketUser, setMarketUser] = useState(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('agrilux_market_user');
     if (stored) setMarketUser(JSON.parse(stored));
   }, []);
 
-  // Registrar usuario del marketplace (agricultor o proveedor)
   const registerMarketUser = async (data) => {
     const docRef = await addDoc(collection(db, 'usuariosMercado'), {
-      ...data,
-      createdAt: new Date().toISOString(),
+      ...data, createdAt: new Date().toISOString(),
     });
     const userData = { id: docRef.id, ...data };
     localStorage.setItem('agrilux_market_user', JSON.stringify(userData));
@@ -24,14 +22,22 @@ export const AuthProvider = ({ children }) => {
     return userData;
   };
 
-  const logoutMarket = () => {
-    localStorage.removeItem('agrilux_market_user');
-    setMarketUser(null);
+  const loginMarketUser = async (celular, codigo) => {
+    const q = query(collection(db, 'usuariosMercado'),
+      where('celular', '==', celular.replace(/\D/g,'')),
+      where('codigo', '==', codigo.toUpperCase())
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) throw new Error('Celular o código incorrecto');
+    const userData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+    localStorage.setItem('agrilux_market_user', JSON.stringify(userData));
+    setMarketUser(userData);
+    return userData;
   };
 
   // user genérico para diagnóstico (sin registro)
   const user = {
-    id: 'anonimo',
+    id: marketUser?.id || 'anonimo',
     nombre: marketUser?.nombre || 'Agricultor',
     ubicacion: marketUser?.ubicacion || 'Perú',
     tipo: marketUser?.tipo || 'agricultor',
@@ -39,7 +45,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, marketUser, registerMarketUser, logoutMarket }}>
+    <AuthContext.Provider value={{ user, marketUser, registerMarketUser, loginMarketUser }}>
       {children}
     </AuthContext.Provider>
   );
