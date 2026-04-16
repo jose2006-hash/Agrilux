@@ -11,7 +11,7 @@ import { useNavigate } from 'react-router-dom';
 const SINTOMAS = ['Manchas', 'Hojas enrolladas', 'Plagas visibles', 'Pudrición',
                   'Amarillamiento', 'Marchitez', 'Tallos débiles', 'Frutos dañados'];
 
-export default function Diagnostico() {
+export default function Diagnostico({ onPlagaDetectada }) {  // ← MODIFICADO: recibir prop
   const { user } = useAuth();
   const navigate = useNavigate();
   const [cultivo, setCultivo] = useState(CULTIVOS[0]);
@@ -19,7 +19,7 @@ export default function Diagnostico() {
   const [sintomas, setSintomas] = useState([]);
   const [ubicacion, setUbicacion] = useState(user?.ubicacion || '');
   const [descripcion, setDescripcion] = useState('');
-  const [mostrarOpciones, setMostrarOpciones] = useState(false); // ← nuevo
+  const [mostrarOpciones, setMostrarOpciones] = useState(false);
   const [analizando, setAnalizando] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [chat, setChat] = useState([]);
@@ -96,6 +96,8 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
       });
 
       setResultado(analisis);
+      // ← MODIFICADO: agregar esta línea
+      if (analisis.tiene_problema && onPlagaDetectada) onPlagaDetectada(analisis.nombre_problema);
 
       try {
         await addDoc(collection(db, 'diagnosticos'), {
