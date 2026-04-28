@@ -5,8 +5,6 @@ import Layout from './components/Layout';
 
 import Registro from './pages/Registro';
 import Diagnostico from './pages/Diagnostico';
-import Mercado from './pages/Mercado';
-import MiParcela from './pages/MiParcela';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -29,8 +27,6 @@ function AppRoutes() {
     <Layout>
       <Routes>
         <Route path="/" element={<Diagnostico onPlagaDetectada={setPlagaDetectada} />} />
-        <Route path="/mercado" element={<Mercado plagaBuscada={plagaDetectada} />} />
-        <Route path="/parcela" element={<MiParcela />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Layout>

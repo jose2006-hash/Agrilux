@@ -1,14 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
-import { Camera, ShoppingCart, Leaf, CreditCard, TrendingUp, Users } from 'lucide-react';
+import { Camera, CreditCard, TrendingUp } from 'lucide-react';
 
 const modules = [
-  { path: '/mercado', icon: ShoppingCart, label: 'Mercado', desc: 'Compra y vende productos', color: 'bg-emerald-500', emoji: '🛒' },
   { path: '/diagnostico', icon: Camera, label: 'Diagnóstico IA', desc: 'Identifica plagas y enfermedades', color: 'bg-blue-500', emoji: '🔬' },
-  { path: '/parcela', icon: Leaf, label: 'Mi Parcela', desc: 'Gestiona tus cultivos', color: 'bg-green-600', emoji: '🌱' },
   { path: '/financiera', icon: CreditCard, label: 'Salud Financiera', desc: 'Próximamente', color: 'bg-amber-500', emoji: '💰', disabled: true },
-  { path: '/comunidad', icon: Users, label: 'Comunidad', desc: 'Conecta con agricultores', color: 'bg-purple-500', emoji: '👥' },
 ];
 
 export default function Home() {
@@ -68,16 +65,6 @@ export default function Home() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Banner comunidad */}
-      <div className="mx-4 mt-4 bg-gradient-to-r from-primary to-primary-light rounded-2xl p-4 text-white">
-        <p className="font-bold text-sm mb-1">🌾 Comunidad Agrilux</p>
-        <p className="text-xs text-white/80">Conecta con agricultores de tu zona, comparte alertas y consejos.</p>
-        <button onClick={() => navigate('/comunidad')}
-          className="mt-3 bg-white text-primary text-xs font-bold px-4 py-1.5 rounded-full">
-          Ver comunidad →
-        </button>
       </div>
     </div>
   );
