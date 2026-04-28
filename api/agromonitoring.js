@@ -15,8 +15,22 @@ function toNum(v) {
 }
 
 export default async function handler(req, res) {
-  const appid = process.env.AGROMONITORING_API_KEY || process.env.VITE_AGROMONITORING_API_KEY;
-  if (!appid) return res.status(500).json({ error: 'AGROMONITORING_API_KEY no configurada' });
+  const appid =
+    process.env.AGROMONITORING_API_KEY ||
+    process.env.AGRO_API_KEY ||
+    process.env.OPENWEATHER_API_KEY ||
+    process.env.OWM_API_KEY ||
+    process.env.APPID ||
+    process.env.VITE_AGROMONITORING_API_KEY;
+
+  if (!appid) {
+    return res.status(500).json({
+      error: 'AGROMONITORING_API_KEY no configurada',
+      hint:
+        'Configura una variable de entorno con tu API key. Recomendado: AGROMONITORING_API_KEY. ' +
+        'También se aceptan: AGRO_API_KEY, OPENWEATHER_API_KEY, OWM_API_KEY, APPID, VITE_AGROMONITORING_API_KEY.',
+    });
+  }
 
   if (req.method !== 'GET') return res.status(405).json({ error: 'Método no permitido' });
 
