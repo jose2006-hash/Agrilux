@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Camera } from 'lucide-react';
+import { Camera, ShieldCheck } from 'lucide-react';
 
 const navItems = [
   { path: '/', icon: Camera, label: 'Diagnóstico' },
+  { path: '/mercado', icon: ShieldCheck, label: 'Fungicidas' },
 ];
 
 export default function Layout({ children }) {

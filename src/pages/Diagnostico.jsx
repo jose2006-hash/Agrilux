@@ -3,6 +3,7 @@ import { Camera, Loader2, AlertTriangle, CheckCircle, Send,
          Mic, MicOff, Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { invokeGemini } from '../lib/gemini';
+import { geocodeUbicacion, getWeather } from '../lib/agromonitoring';
 import { CULTIVOS } from '../lib/constants';
 import { db } from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
@@ -20,9 +21,36 @@ export default function Diagnostico({ onPlagaDetectada }) {  // ← MODIFICADO: 
   const [enviando, setEnviando] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [grabando, setGrabando] = useState(false);
+  const [ctxUbicacion, setCtxUbicacion] = useState(user?.ubicacion || '');
+  const [ctxCoords, setCtxCoords] = useState(null); // { lat, lon }
+  const [ctxWeather, setCtxWeather] = useState(null);
+  const [esperandoUbicacion, setEsperandoUbicacion] = useState(false);
+  const [preguntaPendiente, setPreguntaPendiente] = useState('');
   const fileRef = useRef(null);
   const chatRef = useRef(null);
   const reconRef = useRef(null);
+
+  const parseCoords = (text) => {
+    // Acepta "lat, lon" o "lat lon"
+    const m = text.match(/(-?\d+(?:\.\d+)?)\s*[,\s]\s*(-?\d+(?:\.\d+)?)/);
+    if (!m) return null;
+    const lat = Number(m[1]);
+    const lon = Number(m[2]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { lat, lon };
+  };
+
+  const ensureUbicacionYClima = async (ubicacionInput) => {
+    const coordsDirectas = parseCoords(ubicacionInput);
+    const geo = coordsDirectas || await geocodeUbicacion(ubicacionInput);
+    const coords = coordsDirectas || { lat: geo.lat, lon: geo.lon };
+    setCtxUbicacion(geo?.name ? `${geo.name}${geo.state ? `, ${geo.state}` : ''}${geo.country ? `, ${geo.country}` : ''}` : ubicacionInput);
+    setCtxCoords(coords);
+    const w = await getWeather({ lat: coords.lat, lon: coords.lon, units: 'metric' });
+    setCtxWeather(w);
+    return { coords, weather: w };
+  };
 
   const handleFoto = (e) => {
     const files = Array.from(e.target.files);
@@ -59,7 +87,7 @@ export default function Diagnostico({ onPlagaDetectada }) {  // ← MODIFICADO: 
 
 Datos:
 - Cultivo: ${cultivo.nombre} (${cultivo.emoji})
-- Ubicación: ${user?.ubicacion || 'No especificada'}
+- Ubicación: ${ctxUbicacion || user?.ubicacion || 'No especificada'}
 
 IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos complejos.`,
         file_urls: compressedUrls,
@@ -138,14 +166,54 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
 
   const enviarPregunta = async () => {
     if (!pregunta.trim()) return;
-    const p = pregunta; setPregunta('');
+    let p = pregunta; setPregunta('');
     setChat(prev => [...prev, { role: 'user', text: p }]);
     setEnviando(true);
     try {
+      // Si acabamos de pedir ubicación, este mensaje se interpreta como ubicación.
+      if (esperandoUbicacion) {
+        try {
+          await ensureUbicacionYClima(p);
+          setEsperandoUbicacion(false);
+          const pending = preguntaPendiente;
+          setPreguntaPendiente('');
+          setChat(prev => [...prev, { role: 'ia', text: 'Perfecto. Ya tengo tu ubicación y el clima actual. Ahora sí, dime tu consulta.' }]);
+          if (!pending) { setEnviando(false); return; }
+          // Reinyecta la pregunta pendiente como si fuese la actual.
+          setChat(prev => [...prev, { role: 'user', text: pending }]);
+          // Continúa usando `pending` como la pregunta real.
+          p = pending;
+        } catch (e) {
+          setChat(prev => [...prev, { role: 'ia', text: 'No pude ubicarte. Prueba con “Distrito, Provincia” o con “lat, lon” (ej: -6.23, -78.75).' }]);
+          setEnviando(false);
+          return;
+        }
+      }
+
+      // Si aún no tenemos ubicación/clima, pedirlo primero para mejorar recomendaciones.
+      const faltaContexto = !ctxCoords || !ctxWeather;
+      if (faltaContexto) {
+        setEsperandoUbicacion(true);
+        setPreguntaPendiente(p);
+        setChat(prev => [...prev, {
+          role: 'ia',
+          text: 'Para darte recomendaciones más acertadas necesito tu ubicación. Dime tu distrito/provincia (ej: “Cutervo, Cajamarca”) o tus coordenadas “lat, lon”.'
+        }]);
+        setEnviando(false);
+        return;
+      }
+
       const historial = chat.map(m =>
         `${m.role === 'user' ? 'Agricultor' : 'Asistente'}: ${m.text}`).join('\n');
+      const w = ctxWeather;
+      const weatherTxt = w
+        ? `Clima actual (AgroMonitoring): temp=${w.main?.temp ?? '-'}°C, humedad=${w.main?.humidity ?? '-'}%, nubes=${w.clouds?.all ?? '-'}%, viento=${w.wind?.speed ?? '-'} m/s, condición=${w.weather?.[0]?.description ?? '-'}.`
+        : '';
       const resp = await invokeGemini({
         prompt: `Eres un agrónomo experto. El agricultor tiene un ${cultivo.nombre} con ${resultado?.nombre_problema || 'cultivo saludable'}.
+
+Ubicación del agricultor: ${ctxUbicacion || user?.ubicacion || 'No especificada'}
+${weatherTxt}
 
 Historial: ${historial}
 

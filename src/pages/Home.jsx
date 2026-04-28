@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
-import { Camera, CreditCard, TrendingUp } from 'lucide-react';
+import { Camera, CreditCard, TrendingUp, ShieldCheck } from 'lucide-react';
 
 const modules = [
   { path: '/diagnostico', icon: Camera, label: 'Diagnóstico IA', desc: 'Identifica plagas y enfermedades', color: 'bg-blue-500', emoji: '🔬' },
+  { path: '/mercado', icon: ShieldCheck, label: 'Fungicidas', desc: 'Recomendaciones y productos', color: 'bg-emerald-500', emoji: '🛡️' },
   { path: '/financiera', icon: CreditCard, label: 'Salud Financiera', desc: 'Próximamente', color: 'bg-amber-500', emoji: '💰', disabled: true },
 ];
 
