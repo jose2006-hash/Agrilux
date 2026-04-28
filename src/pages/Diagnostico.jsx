@@ -116,14 +116,17 @@ IMPORTANTE: Responde en lenguaje simple y directo, sin términos técnicos compl
       if (analisis.tiene_problema && onPlagaDetectada) onPlagaDetectada(analisis.nombre_problema);
 
       try {
-        await addDoc(collection(db, 'diagnosticos'), {
-          userId: user?.id,
-          userName: user?.nombre,
-          cultivo: cultivo.nombre,
-          ubicacion: user?.ubicacion || '',
-          resultado: analisis,
-          fecha: new Date().toISOString(),
-        });
+        const userId = user?.uid || user?.id || null;
+        if (userId) {
+          await addDoc(collection(db, 'diagnosticos'), {
+            userId,
+            userName: user?.nombre || '',
+            cultivo: cultivo.nombre,
+            ubicacion: user?.ubicacion || '',
+            resultado: analisis,
+            fecha: new Date().toISOString(),
+          });
+        }
       } catch (e) { console.log('Firebase save error', e); }
 
       leerTexto(`${analisis.tiene_problema

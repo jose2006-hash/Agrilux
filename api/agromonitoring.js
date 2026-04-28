@@ -3,11 +3,11 @@
  *
  * Docs:
  * - https://agromonitoring.com/api/current-weather
- * - https://openweathermap.org/api/geocoding-api (geo endpoint suele aceptar el mismo appid)
+ * - Geocoding sin key: Nominatim (OpenStreetMap)
  */
 
 const AGRO_BASE = 'https://api.agromonitoring.com/agro/1.0';
-const GEO_BASE = 'https://api.openweathermap.org/geo/1.0';
+const NOMINATIM_BASE = 'https://nominatim.openstreetmap.org';
 
 function toNum(v) {
   const n = Number(v);
@@ -41,23 +41,29 @@ export default async function handler(req, res) {
       const q = (req.query?.q || '').toString().trim();
       if (!q) return res.status(400).json({ error: 'q requerido' });
 
-      const url = new URL(`${GEO_BASE}/direct`);
+      const url = new URL(`${NOMINATIM_BASE}/search`);
       url.searchParams.set('q', q);
+      url.searchParams.set('format', 'json');
       url.searchParams.set('limit', '1');
-      url.searchParams.set('appid', appid);
 
-      const r = await fetch(url);
+      const r = await fetch(url, {
+        headers: {
+          // Nominatim pide un User-Agent identificable
+          'User-Agent': 'agrilux/1.0 (contact: dev@local)',
+          'Accept': 'application/json',
+        },
+      });
       const text = await r.text();
       if (!r.ok) return res.status(r.status).json({ error: 'Geocode error', details: text });
       const data = JSON.parse(text);
       const item = Array.isArray(data) ? data[0] : null;
       if (!item) return res.status(404).json({ error: 'No encontrado' });
       return res.status(200).json({
-        name: item.name,
-        state: item.state,
-        country: item.country,
-        lat: item.lat,
-        lon: item.lon,
+        name: item.display_name,
+        state: null,
+        country: null,
+        lat: Number(item.lat),
+        lon: Number(item.lon),
       });
     }
 
