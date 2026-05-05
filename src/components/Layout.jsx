@@ -3,8 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Camera, ShieldCheck } from 'lucide-react';
 
 const navItems = [
-  { path: '/', icon: Camera, label: 'Diagnóstico' },
-  { path: '/mercado', icon: ShieldCheck, label: 'Fungicidas' },
+  { path: '/',        icon: Camera,      label: 'Diagnóstico' },
+  { path: '/mercado', icon: ShieldCheck, label: 'Fungicidas'  },
 ];
 
 export default function Layout({ children }) {
@@ -12,7 +12,7 @@ export default function Layout({ children }) {
   const location = useLocation();
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen max-w-[430px] mx-auto">
       <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-100 shadow-lg z-50">
         <div className="flex">

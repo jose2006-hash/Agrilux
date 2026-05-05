@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import Layout from './components/Layout';
-
 import Registro from './pages/Registro';
 import Diagnostico from './pages/Diagnostico';
 import Mercado from './pages/Mercado';
