@@ -5,7 +5,7 @@ import { useAuth } from '../lib/AuthContext';
 import { invokeGemini } from '../lib/gemini';
 import { CULTIVOS } from '../lib/constants';
 import { db } from '../lib/firebase';
-import { collection, addDoc, updateDoc, doc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
 const SISTEMA_PROMPT = {
@@ -206,8 +206,6 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const [enviando, setEnviando] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [grabando, setGrabando] = useState(false);
-  const [confirmado, setConfirmado] = useState(null);
-  const [diagnosticoId, setDiagnosticoId] = useState(null);
   const [productoBuscando, setProductoBuscando] = useState(null); // para modal tiendas
   const fileRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -238,16 +236,13 @@ export default function Diagnostico({ onPlagaDetectada }) {
     img.src = dataUrl;
   });
 
-  const analizar = async () => {
-    if (fotos.length === 0) { alert('Sube al menos una foto'); return; }
-    setAnalizando(true);
-    try {
-      const compressedUrls = await Promise.all(fotos.map(f => compressDataUrl(f.dataUrl)));
-
-      const analisis = await invokeGemini({
-        prompt: `${SISTEMA_PROMPT[cultivo.id]}
+  const analizarUnaVez = async (compressedUrls, intento) => {
+    return invokeGemini({
+      prompt: `${SISTEMA_PROMPT[cultivo.id]}
 
 Analiza esta imagen del cultivo de ${cultivo.nombre}.
+Revisa cuidadosamente y realiza al menos 3 análisis independientes del mismo documento para confirmar el diagnóstico.
+Responde con seguridad y no preguntes si el diagnóstico es correcto o no.
 
 INSTRUCCIONES:
 1. Identifica con precisión la plaga, enfermedad o maleza
@@ -256,45 +251,73 @@ INSTRUCCIONES:
 4. Incluye dosis exacta (ml o g por litro o hectárea), frecuencia y período de carencia
 5. Menciona 2-3 productos alternativos para rotación y evitar resistencias
 6. Responde en español claro para un agricultor peruano`,
-        file_urls: compressedUrls,
-        response_json_schema: {
-          type: 'object',
-          properties: {
-            tiene_problema: { type: 'boolean' },
-            nombre_problema: { type: 'string' },
-            nombre_cientifico: { type: 'string' },
-            gravedad: { type: 'string', enum: ['ninguna', 'leve', 'moderada', 'grave', 'critica'] },
-            que_tiene: { type: 'string' },
-            causa: { type: 'string' },
-            aplicacion_inmediata: { type: 'string' },
-            que_hacer: { type: 'string' },
-            productos: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  nombre: { type: 'string' },
-                  ingrediente_activo: { type: 'string' },
-                  dosis: { type: 'string' },
-                  frecuencia: { type: 'string' },
-                  carencia: { type: 'string' }
-                }
+      file_urls: compressedUrls,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          tiene_problema: { type: 'boolean' },
+          nombre_problema: { type: 'string' },
+          nombre_cientifico: { type: 'string' },
+          gravedad: { type: 'string', enum: ['ninguna', 'leve', 'moderada', 'grave', 'critica'] },
+          que_tiene: { type: 'string' },
+          causa: { type: 'string' },
+          aplicacion_inmediata: { type: 'string' },
+          que_hacer: { type: 'string' },
+          productos: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                nombre: { type: 'string' },
+                ingrediente_activo: { type: 'string' },
+                dosis: { type: 'string' },
+                frecuencia: { type: 'string' },
+                carencia: { type: 'string' }
               }
-            },
-            cuando_aplicar: { type: 'string' },
-            prevencion: { type: 'string' },
-            alerta_clima: { type: 'string' },
-          }
+            }
+          },
+          cuando_aplicar: { type: 'string' },
+          prevencion: { type: 'string' },
+          alerta_clima: { type: 'string' },
         }
-      });
+      }
+    });
+  };
+
+  const obtenerConsensoAnalisis = (resultados) => {
+    const normalizar = (texto) => (texto || '').trim().toLowerCase();
+    const conteo = resultados.reduce((acc, r) => {
+      const clave = `${normalizar(r.nombre_problema) || 'saludable'}|${normalizar(r.gravedad) || 'ninguna'}`;
+      acc[clave] = (acc[clave] || 0) + 1;
+      return acc;
+    }, {});
+    const ganador = Object.entries(conteo).sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (!ganador) return resultados[0];
+    const [nombreGanador, gravedadGanador] = ganador.split('|');
+    return resultados.find(r =>
+      normalizar(r.nombre_problema) === nombreGanador &&
+      normalizar(r.gravedad) === gravedadGanador
+    ) || resultados[0];
+  };
+
+  const analizar = async () => {
+    if (fotos.length === 0) { alert('Sube al menos una foto'); return; }
+    setAnalizando(true);
+    try {
+      const compressedUrls = await Promise.all(fotos.map(f => compressDataUrl(f.dataUrl)));
+
+      const intentos = [];
+      for (let i = 1; i <= 3; i += 1) {
+        intentos.push(await analizarUnaVez(compressedUrls, i));
+      }
+      const analisis = obtenerConsensoAnalisis(intentos);
 
       setResultado(analisis);
-      setConfirmado(null);
       setChat([]);
 
       // Guardar para dataset ML
       try {
-        const docRef = await addDoc(collection(db, 'diagnosticos'), {
+        await addDoc(collection(db, 'diagnosticos'), {
           userId: user?.uid,
           userName: user?.nombre,
           userEmail: user?.email,
@@ -312,7 +335,6 @@ INSTRUCCIONES:
           fecha: new Date().toISOString(),
           mes: new Date().getMonth() + 1,
         });
-        setDiagnosticoId(docRef.id);
       } catch (e) { console.log('Dataset error:', e); }
 
       if (analisis.tiene_problema && onPlagaDetectada) {
@@ -328,17 +350,6 @@ INSTRUCCIONES:
       setResultado({ error: true });
     }
     setAnalizando(false);
-  };
-
-  const confirmarDiagnostico = async (correcto) => {
-    setConfirmado(correcto);
-    if (!diagnosticoId) return;
-    try {
-      await updateDoc(doc(db, 'diagnosticos', diagnosticoId), {
-        confirmado_por_usuario: correcto,
-        fecha_confirmacion: new Date().toISOString(),
-      });
-    } catch (e) { console.log(e); }
   };
 
   const leerTexto = (texto) => {
@@ -567,29 +578,6 @@ INSTRUCCIONES:
               </button>
           }
         </div>
-
-        {/* Feedback ML */}
-        {confirmado === null ? (
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
-              ¿Fue correcto este diagnóstico?
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => confirmarDiagnostico(true)}
-                className="flex-1 bg-green-100 text-green-700 font-bold py-2.5 rounded-xl text-sm">
-                ✅ Sí, correcto
-              </button>
-              <button onClick={() => confirmarDiagnostico(false)}
-                className="flex-1 bg-red-100 text-red-600 font-bold py-2.5 rounded-xl text-sm">
-                ❌ No fue correcto
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className={`rounded-2xl p-3 text-center text-sm font-semibold ${confirmado ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
-            {confirmado ? '✅ Gracias, mejoras PlaguIA 🌱' : '❌ Gracias, lo usaremos para mejorar'}
-          </div>
-        )}
 
         {/* Chat */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
