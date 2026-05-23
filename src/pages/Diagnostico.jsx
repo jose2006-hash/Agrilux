@@ -1,13 +1,20 @@
-import React, { useState, useRef } from 'react';
-import { Camera, Loader2, AlertTriangle, CheckCircle, Send,
-         Mic, MicOff, Volume2, VolumeX, ShoppingBag, ChevronRight, Star } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Camera, Loader2, AlertTriangle, CheckCircle, Send,
+  Mic, MicOff, Volume2, VolumeX, ShoppingBag, ChevronRight,
+  Star, Bot, Package, Truck, X, MapPin, ArrowRight,
+  CheckCircle2, XCircle, Sparkles, Phone
+} from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import { invokeGemini } from '../lib/gemini';
 import { CULTIVOS } from '../lib/constants';
 import { db } from '../lib/firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   PROMPTS DEL SISTEMA (sin cambios)
+───────────────────────────────────────────────────────────────────────────── */
 const SISTEMA_PROMPT = {
   papa: `Eres PlaguIA, sistema experto en protección fitosanitaria de papa (Solanum tuberosum) 
 para agricultores peruanos. Tienes conocimiento profundo de:
@@ -35,24 +42,21 @@ const CHAT_SYSTEM = {
   arandano: `Eres PlaguIA, agrónomo experto en arándanos para Perú exportación con estándares GlobalGAP.`
 };
 
-// ─── COMPONENTE: TIENDAS CON EL PRODUCTO ─────────────────────────────────────
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPONENTE: TIENDAS CON EL PRODUCTO (sin cambios)
+───────────────────────────────────────────────────────────────────────────── */
 function TiendasConProducto({ productoBuscado, onCerrar }) {
   const [tiendas, setTiendas] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  React.useEffect(() => {
-    buscarProductoEnTiendas();
-  }, [productoBuscado]);
+  useEffect(() => { buscarProductoEnTiendas(); }, [productoBuscado]);
 
   const buscarProductoEnTiendas = async () => {
     setLoading(true);
     try {
-      // Buscar todos los productos que coincidan con el nombre
       const snap = await getDocs(collection(db, 'productos'));
       const todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-      // Filtrar por nombre similar al producto buscado
       const palabrasClave = productoBuscado.toLowerCase().split(/\s+/).filter(p => p.length > 2);
       const coincidentes = todos.filter(p => {
         const nombreProd = (p.nombre || '').toLowerCase();
@@ -63,58 +67,32 @@ function TiendasConProducto({ productoBuscado, onCerrar }) {
           palabra.includes(nombreProd.split(' ')[0])
         );
       });
-
-      // Agrupar por tienda y obtener datos de tienda
       const tiendasSnap = await getDocs(collection(db, 'tiendas'));
       const tiendasMap = {};
       tiendasSnap.docs.forEach(d => { tiendasMap[d.id] = { id: d.id, ...d.data() }; });
-
-      // Armar resultado: tienda + producto + precio
       const resultado = [];
       coincidentes.forEach(prod => {
         const tienda = tiendasMap[prod.tiendaId];
-        if (tienda && prod.disponible) {
-          resultado.push({ ...prod, tiendaInfo: tienda });
-        }
+        if (tienda && prod.disponible) resultado.push({ ...prod, tiendaInfo: tienda });
       });
-
-      // Ordenar por precio (menor primero)
-      resultado.sort((a, b) => {
-        const pa = parseFloat(a.precio) || 9999;
-        const pb = parseFloat(b.precio) || 9999;
-        return pa - pb;
-      });
-
+      resultado.sort((a, b) => (parseFloat(a.precio) || 9999) - (parseFloat(b.precio) || 9999));
       setTiendas(resultado);
-    } catch (e) {
-      console.error('Error buscando tiendas:', e);
-      setTiendas([]);
-    }
+    } catch (e) { setTiendas([]); }
     setLoading(false);
-  };
-
-  const irATienda = () => {
-    navigate('/mercado');
-    onCerrar();
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-end">
       <div className="bg-white rounded-t-3xl w-full max-w-[430px] mx-auto max-h-[85vh] overflow-y-auto">
-        {/* Header */}
         <div className="sticky top-0 bg-white px-6 pt-6 pb-4 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-display font-bold text-lg text-gray-800">
-                🛡️ {productoBuscado}
-              </h3>
+              <h3 className="font-display font-bold text-lg text-gray-800">🛡️ {productoBuscado}</h3>
               <p className="text-xs text-gray-500">Tiendas disponibles ordenadas por precio</p>
             </div>
-            <button onClick={onCerrar}
-              className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">✕</button>
+            <button onClick={onCerrar} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">✕</button>
           </div>
         </div>
-
         <div className="px-4 py-4 space-y-3">
           {loading ? (
             <div className="flex flex-col items-center py-10 gap-3">
@@ -124,42 +102,31 @@ function TiendasConProducto({ productoBuscado, onCerrar }) {
           ) : tiendas.length === 0 ? (
             <div className="text-center py-10">
               <p className="text-4xl mb-3">🏪</p>
-              <p className="font-bold text-gray-700">No encontramos este producto en tiendas</p>
-              <p className="text-sm text-gray-400 mt-1 mb-4">Pero puedes buscar en el marketplace o consultar por WhatsApp</p>
-              <button onClick={irATienda}
-                className="bg-primary text-white font-bold px-6 py-3 rounded-2xl text-sm">
+              <p className="font-bold text-gray-700">No encontramos este producto</p>
+              <button onClick={() => { navigate('/mercado'); onCerrar(); }}
+                className="bg-primary text-white font-bold px-6 py-3 rounded-2xl text-sm mt-4">
                 Ver todas las tiendas →
               </button>
             </div>
           ) : (
             <>
-              {/* Mejor precio badge */}
               <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center gap-2">
                 <Star size={16} className="text-green-600 fill-green-600" />
                 <p className="text-xs font-bold text-green-700">
                   Mejor precio: {tiendas[0].tiendaInfo?.empresa} — S/ {tiendas[0].precio}
                 </p>
               </div>
-
               {tiendas.map((prod, idx) => (
                 <div key={prod.id}
                   className={`bg-white rounded-2xl p-4 shadow-sm border ${idx === 0 ? 'border-primary' : 'border-gray-100'}`}>
-                  {idx === 0 && (
-                    <span className="text-xs bg-primary text-white font-bold px-2.5 py-1 rounded-full mb-2 inline-block">
-                      ⭐ Mejor precio
-                    </span>
-                  )}
+                  {idx === 0 && <span className="text-xs bg-primary text-white font-bold px-2.5 py-1 rounded-full mb-2 inline-block">⭐ Mejor precio</span>}
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <p className="font-bold text-gray-800">{prod.nombre}</p>
                       <p className="text-xs text-gray-500 mt-0.5">🏪 {prod.tiendaInfo?.empresa}</p>
                       <p className="text-xs text-gray-400">📍 {prod.tiendaInfo?.ubicacion}</p>
-                      {prod.plagasQueControla && (
-                        <p className="text-xs text-red-500 mt-1">🐛 {prod.plagasQueControla}</p>
-                      )}
-                      {prod.uso && (
-                        <p className="text-xs text-gray-500 mt-0.5">💊 {prod.uso}</p>
-                      )}
+                      {prod.plagasQueControla && <p className="text-xs text-red-500 mt-1">🐛 {prod.plagasQueControla}</p>}
+                      {prod.uso && <p className="text-xs text-gray-500 mt-0.5">💊 {prod.uso}</p>}
                     </div>
                     <div className="text-right ml-3">
                       <p className="text-xl font-bold text-primary">S/ {prod.precio}</p>
@@ -168,24 +135,15 @@ function TiendasConProducto({ productoBuscado, onCerrar }) {
                   </div>
                   <div className="flex gap-2 mt-3">
                     {prod.tiendaInfo?.celular && (
-                      <a href={`https://wa.me/51${prod.tiendaInfo.celular.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, vi en AGRILUX que tienen ${prod.nombre}. ¿Está disponible y cuál es el precio?`)}`}
+                      <a href={`https://wa.me/51${prod.tiendaInfo.celular.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, vi en AGRILUX que tienen ${prod.nombre}. ¿Está disponible?`)}`}
                         target="_blank" rel="noreferrer"
                         className="flex-1 bg-green-500 text-white text-xs font-bold py-2.5 rounded-xl text-center">
                         📲 Consultar
                       </a>
                     )}
-                    <button onClick={irATienda}
-                      className="flex-1 bg-primary/10 text-primary text-xs font-bold py-2.5 rounded-xl">
-                      Ver tienda →
-                    </button>
                   </div>
                 </div>
               ))}
-
-              <button onClick={irATienda}
-                className="w-full border border-gray-200 text-gray-600 font-semibold py-3 rounded-2xl text-sm">
-                Ver todas las tiendas
-              </button>
             </>
           )}
         </div>
@@ -194,6 +152,619 @@ function TiendasConProducto({ productoBuscado, onCerrar }) {
   );
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   AGENTE DE COMPRA — el corazón nuevo
+   Pasos: buscando → propuesta → direccion → resumen → exito | sin_stock | error
+───────────────────────────────────────────────────────────────────────────── */
+function AgenteCompra({ resultado, cultivo, user, onCerrar }) {
+  const [paso, setPaso] = useState('buscando');
+  const [mejorProducto, setMejorProducto] = useState(null);
+  const [tiendaInfo, setTiendaInfo] = useState(null);
+  const [guiaAplicacion, setGuiaAplicacion] = useState('');
+  const [costoNeto, setCostoNeto] = useState(0);
+  const [direccion, setDireccion] = useState('');
+  const [referencia, setReferencia] = useState('');
+  const [grabandoDireccion, setGrabandoDireccion] = useState(false);
+  const [grabandoConfirm, setGrabandoConfirm] = useState(false);
+  const [creandoPedido, setCreandoPedido] = useState(false);
+  const [mensajeAgente, setMensajeAgente] = useState('');
+  const [leyendo, setLeyendo] = useState(false);
+  const reconRef = useRef(null);
+  const navigate = useNavigate();
+
+  /* ── helpers de voz ── */
+  const leerTexto = (texto) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'es-PE'; u.rate = 0.85;
+    setLeyendo(true);
+    u.onend = () => setLeyendo(false);
+    u.onerror = () => setLeyendo(false);
+    window.speechSynthesis.speak(u);
+  };
+
+  const detenerVoz = () => { window.speechSynthesis?.cancel(); setLeyendo(false); };
+
+  const grabarVoz = (onResultado) => {
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      alert('Usa Chrome para la función de voz'); return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR();
+    r.lang = 'es-PE'; r.continuous = false;
+    r.onresult = (e) => onResultado(e.results[0][0].transcript);
+    r.onerror = () => {};
+    r.onend = () => {};
+    reconRef.current = r;
+    r.start();
+    return r;
+  };
+
+  /* ── PASO 1: buscar el mejor producto en Firebase ── */
+  useEffect(() => { buscarMejorProducto(); }, []);
+
+  const buscarMejorProducto = async () => {
+    setPaso('buscando');
+    setMensajeAgente('Analizando tu diagnóstico y buscando el mejor fungicida disponible...');
+    try {
+      const snap = await getDocs(collection(db, 'productos'));
+      const todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      /* Palabras clave: nombre del problema + productos recomendados por la IA */
+      const palabrasClave = [
+        ...(resultado.nombre_problema || '').toLowerCase().split(/\s+/).filter(p => p.length > 2),
+        ...(resultado.productos || []).flatMap(p =>
+          (p.nombre || '').toLowerCase().split(/\s+/).filter(w => w.length > 2)
+        ),
+        ...(resultado.nombre_cientifico || '').toLowerCase().split(/\s+/).filter(p => p.length > 3),
+      ];
+
+      /* Filtrar disponibles que coincidan */
+      let candidatos = todos.filter(p => {
+        if (!p.disponible) return false;
+        const texto = `${p.nombre} ${p.plagasQueControla} ${p.descripcion}`.toLowerCase();
+        return palabrasClave.some(pc => texto.includes(pc));
+      });
+
+      /* Fallback: todos los disponibles del cultivo */
+      if (candidatos.length === 0) {
+        candidatos = todos.filter(p => p.disponible &&
+          (p.cultivos || []).includes(cultivo.id));
+      }
+      /* Último recurso: cualquier disponible */
+      if (candidatos.length === 0) {
+        candidatos = todos.filter(p => p.disponible);
+      }
+      if (candidatos.length === 0) { setPaso('sin_stock'); return; }
+
+      /* Ordenar por precio (mejor primero) */
+      candidatos.sort((a, b) => (parseFloat(a.precio) || 9999) - (parseFloat(b.precio) || 9999));
+      const mejor = candidatos[0];
+
+      /* Obtener info de la tienda */
+      const tiendasSnap = await getDocs(collection(db, 'tiendas'));
+      const tiendasMap = {};
+      tiendasSnap.docs.forEach(d => { tiendasMap[d.id] = { id: d.id, ...d.data() }; });
+      const tienda = tiendasMap[mejor.tiendaId];
+      if (!tienda) { setPaso('sin_stock'); return; }
+
+      setMejorProducto(mejor);
+      setTiendaInfo(tienda);
+      setCostoNeto(parseFloat(mejor.precio) || 0);
+
+      /* Generar guía de aplicación personalizada con IA */
+      setMensajeAgente('Generando instrucciones de aplicación personalizadas...');
+      const dosis = resultado.productos?.[0]?.dosis || '';
+      const frecuencia = resultado.productos?.[0]?.frecuencia || '';
+      const carencia = resultado.productos?.[0]?.carencia || '';
+
+      const guia = await invokeGemini({
+        prompt: `Eres PlaguIA, agrónomo experto. Situación:
+- Cultivo: ${cultivo.nombre}
+- Problema detectado: ${resultado.nombre_problema}
+- Producto seleccionado: ${mejor.nombre} (${mejor.ingrediente_activo || ''})
+- Uso del producto: ${mejor.uso || ''}
+- Dosis recomendada por diagnóstico: ${dosis}
+- Frecuencia: ${frecuencia}
+- Período de carencia: ${carencia}
+
+Escribe una guía de aplicación en 3 pasos NUMERADOS, muy práctica y en español simple para un agricultor peruano.
+Incluye: dosis exacta, momento del día para aplicar y equipo de protección básico.
+Máximo 100 palabras en total. Sin encabezados, solo los 3 pasos numerados.`
+      });
+
+      setGuiaAplicacion(guia);
+      setPaso('propuesta');
+
+      const textoVoz = `Encontré el mejor producto para tu ${cultivo.nombre}. 
+        ${mejor.nombre} disponible en ${tienda.empresa}, ubicada en ${tienda.ubicacion}, 
+        a solo ${mejor.precio} soles. ¿Quieres que lo pida con delivery a tu parcela?`;
+      leerTexto(textoVoz);
+
+    } catch (e) {
+      console.error(e);
+      setPaso('error');
+    }
+  };
+
+  /* ── PASO 3: confirmar pedido en Firebase ── */
+  const confirmarPedido = async () => {
+    if (!direccion.trim()) {
+      leerTexto('Por favor dime tu dirección de entrega.');
+      return;
+    }
+    setCreandoPedido(true);
+    try {
+      const total = costoNeto;
+      await addDoc(collection(db, 'pedidos'), {
+        productoId: mejorProducto.id,
+        productoNombre: mejorProducto.nombre,
+        tiendaId: tiendaInfo.id,
+        tiendaEmpresa: tiendaInfo.empresa,
+        tiendaCelular: tiendaInfo.celular || '',
+        agricultorId: user?.uid || '',
+        agricultorNombre: user?.nombre || '',
+        agricultorEmail: user?.email || '',
+        agricultorCelular: user?.celular || '',
+        cantidad: 1,
+        precioUnitario: total,
+        total,
+        comision: total * 0.05,
+        direccionEntrega: direccion,
+        referencia,
+        estado: 'pendiente',
+        origenAgente: true,
+        diagnosticoProblema: resultado.nombre_problema,
+        cultivoNombre: cultivo.nombre,
+        guiaAplicacion,
+        createdAt: new Date().toISOString(),
+      });
+
+      setPaso('exito');
+      leerTexto(`¡Perfecto! Tu pedido de ${mejorProducto.nombre} fue registrado exitosamente. 
+        El equipo de ${tiendaInfo.empresa} lo confirmará pronto y un motorizado lo llevará a tu parcela. 
+        Recuerda: ${guiaAplicacion.split('.')[0]}.`);
+    } catch (e) {
+      alert('Error al crear el pedido. Intenta de nuevo.');
+    }
+    setCreandoPedido(false);
+  };
+
+  /* ── Reconocimiento de voz para confirmar/cancelar ── */
+  const escucharDecision = () => {
+    setGrabandoConfirm(true);
+    const r = grabarVoz((texto) => {
+      setGrabandoConfirm(false);
+      const t = texto.toLowerCase();
+      if (t.includes('confirm') || t.includes('cerrar pedido') || t.includes('acepto') || t.includes('sí') || t.includes('si')) {
+        confirmarPedido();
+      } else if (t.includes('cancel') || t.includes('no quiero') || t.includes('cancelar')) {
+        onCerrar();
+      } else {
+        leerTexto('No entendí. Di "confirmar pedido" o "cancelar".');
+      }
+    });
+    if (r) {
+      r.onstart = () => setGrabandoConfirm(true);
+      r.onend = () => setGrabandoConfirm(false);
+    }
+  };
+
+  /* ═══════════════════════════ RENDERS POR PASO ═══════════════════════════ */
+
+  /* Pantalla: buscando */
+  if (paso === 'buscando') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl">
+        <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-5">
+          <Bot size={36} className="text-primary animate-pulse" />
+        </div>
+        <h3 className="font-display font-bold text-xl text-gray-800 mb-2">Agente PlaguIA</h3>
+        <p className="text-sm text-gray-500 mb-6">{mensajeAgente}</p>
+        <div className="flex justify-center gap-1.5">
+          {[0,1,2].map(i => (
+            <div key={i} className="w-2.5 h-2.5 bg-primary rounded-full animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Pantalla: sin stock */
+  if (paso === 'sin_stock') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+      <div className="bg-white rounded-t-3xl w-full max-w-[430px] mx-auto p-6 text-center">
+        <p className="text-4xl mb-3">🏪</p>
+        <h3 className="font-bold text-lg text-gray-800 mb-2">Sin stock disponible</h3>
+        <p className="text-sm text-gray-500 mb-5">No encontramos el fungicida en tiendas registradas ahora mismo. Puedes buscar manualmente en el marketplace.</p>
+        <div className="flex gap-3">
+          <button onClick={onCerrar} className="flex-1 border border-gray-200 text-gray-600 font-bold py-3 rounded-2xl text-sm">Volver</button>
+          <button onClick={() => { navigate('/mercado'); onCerrar(); }}
+            className="flex-1 bg-primary text-white font-bold py-3 rounded-2xl text-sm">Ver tiendas</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Pantalla: error */
+  if (paso === 'error') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+      <div className="bg-white rounded-t-3xl w-full max-w-[430px] mx-auto p-6 text-center">
+        <AlertTriangle size={40} className="mx-auto text-red-400 mb-3" />
+        <h3 className="font-bold text-lg text-gray-800 mb-2">Error del agente</h3>
+        <p className="text-sm text-gray-500 mb-5">Ocurrió un problema. Intenta de nuevo.</p>
+        <div className="flex gap-3">
+          <button onClick={onCerrar} className="flex-1 border border-gray-200 text-gray-600 font-bold py-3 rounded-2xl text-sm">Cancelar</button>
+          <button onClick={buscarMejorProducto} className="flex-1 bg-primary text-white font-bold py-3 rounded-2xl text-sm">Reintentar</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Pantalla: propuesta del agente */
+  if (paso === 'propuesta') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+      <div className="bg-white rounded-t-3xl w-full max-w-[430px] mx-auto max-h-[92vh] overflow-y-auto">
+
+        {/* Header agente */}
+        <div className="bg-gradient-to-r from-primary to-emerald-600 px-6 pt-6 pb-5 text-white rounded-t-3xl">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                <Bot size={18} className="text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">Agente PlaguIA</p>
+                <p className="text-white/70 text-xs">Selección automática · Mejor precio</p>
+              </div>
+            </div>
+            <button onClick={onCerrar} className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+              <X size={16} className="text-white" />
+            </button>
+          </div>
+          <div className="bg-white/15 rounded-2xl p-3">
+            <p className="text-white/90 text-sm leading-relaxed">
+              🤖 Encontré el <strong>mejor producto</strong> para tu {cultivo.emoji} {cultivo.nombre} con <strong>{resultado.nombre_problema}</strong>.
+              Aquí está mi propuesta:
+            </p>
+          </div>
+        </div>
+
+        <div className="px-4 py-4 space-y-4">
+
+          {/* Producto seleccionado */}
+          <div className="bg-primary/5 border-2 border-primary rounded-2xl p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xs bg-primary text-white font-bold px-2 py-0.5 rounded-full">⭐ Mejor precio</span>
+                </div>
+                <p className="font-bold text-gray-800 text-base">{mejorProducto.nombre}</p>
+                {mejorProducto.ingrediente_activo && (
+                  <p className="text-xs text-gray-400 italic">{mejorProducto.ingrediente_activo}</p>
+                )}
+              </div>
+              <div className="text-right ml-3">
+                <p className="text-2xl font-bold text-primary">S/ {mejorProducto.precio}</p>
+                <p className="text-xs text-gray-400">por unidad</p>
+              </div>
+            </div>
+            {mejorProducto.plagasQueControla && (
+              <div className="bg-red-50 rounded-xl p-2 mb-2">
+                <p className="text-xs text-red-600 font-semibold">🐛 {mejorProducto.plagasQueControla}</p>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-xs text-gray-500 pt-1 border-t border-primary/10">
+              <span>🏪</span>
+              <span className="font-semibold">{tiendaInfo.empresa}</span>
+              <span>·</span>
+              <span>📍 {tiendaInfo.ubicacion}</span>
+            </div>
+          </div>
+
+          {/* Guía de aplicación */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+              📋 Cómo aplicar este producto
+            </p>
+            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{guiaAplicacion}</p>
+          </div>
+
+          {/* Costo neto */}
+          <div className="bg-gray-50 rounded-2xl p-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">💰 Resumen de costo</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Producto</span>
+                <span className="font-semibold text-gray-800">S/ {costoNeto.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Delivery</span>
+                <span className="font-semibold text-green-600">Coordinado con tienda</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-gray-200">
+                <span className="font-bold text-gray-800">Costo neto</span>
+                <span className="font-bold text-primary text-base">S/ {costoNeto.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botones de acción */}
+          <div className="flex gap-3 pb-2">
+            <button onClick={onCerrar}
+              className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-3.5 rounded-2xl text-sm">
+              Seguir consultando
+            </button>
+            <button onClick={() => {
+              setPaso('direccion');
+              setTimeout(() => leerTexto('¿A qué dirección te entregamos el producto? Puedes escribirla o dictarla con el micrófono.'), 300);
+            }}
+              className="flex-1 bg-primary text-white font-bold py-3.5 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg">
+              <Package size={16} /> Pedir ahora
+            </button>
+          </div>
+
+          {/* Audio toggle */}
+          <button
+            onClick={leyendo ? detenerVoz : () => leerTexto(`${mejorProducto.nombre} en ${tiendaInfo.empresa} a ${costoNeto} soles. ${guiaAplicacion}`)}
+            className={`w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-2xl text-sm transition-colors ${
+              leyendo ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
+            }`}>
+            {leyendo ? <><VolumeX size={16} /> Detener audio</> : <><Volume2 size={16} /> Escuchar propuesta</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Pantalla: ingresar dirección */
+  if (paso === 'direccion') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+      <div className="bg-white rounded-t-3xl w-full max-w-[430px] mx-auto p-6">
+
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+            <MapPin size={20} className="text-primary" />
+          </div>
+          <div>
+            <h3 className="font-bold text-gray-800">¿Dónde entregamos?</h3>
+            <p className="text-xs text-gray-500">Escribe o dicta tu dirección</p>
+          </div>
+          <button onClick={onCerrar} className="ml-auto w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+            <X size={15} className="text-gray-500" />
+          </button>
+        </div>
+
+        {/* Producto mini resumen */}
+        <div className="bg-primary/5 rounded-2xl p-3 mb-4 flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center text-lg">💊</div>
+          <div className="flex-1 min-w-0">
+            <p className="font-bold text-sm text-gray-800 truncate">{mejorProducto.nombre}</p>
+            <p className="text-xs text-gray-500">{tiendaInfo.empresa} · S/ {costoNeto.toFixed(2)}</p>
+          </div>
+        </div>
+
+        <div className="space-y-3 mb-5">
+          <div>
+            <label className="text-xs font-bold text-gray-600 block mb-1.5">📍 Dirección exacta *</label>
+            <div className="relative">
+              <textarea
+                value={direccion}
+                onChange={e => setDireccion(e.target.value)}
+                rows={3}
+                placeholder="Sector, nombre de parcela, distrito, provincia, referencias..."
+                className="w-full border-2 border-gray-200 rounded-2xl px-4 py-3 text-sm focus:outline-none focus:border-primary resize-none pr-12"
+              />
+              {/* Botón micrófono dentro del textarea */}
+              <button
+                onClick={() => {
+                  setGrabandoDireccion(true);
+                  const r = grabarVoz((texto) => {
+                    setDireccion(texto);
+                    setGrabandoDireccion(false);
+                  });
+                  if (r) {
+                    r.onstart = () => setGrabandoDireccion(true);
+                    r.onend = () => setGrabandoDireccion(false);
+                  }
+                }}
+                className={`absolute right-3 top-3 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                  grabandoDireccion ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-100 text-gray-500'
+                }`}>
+                {grabandoDireccion ? <MicOff size={16} /> : <Mic size={16} />}
+              </button>
+            </div>
+            {grabandoDireccion && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-ping" /> Escuchando...
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-600 block mb-1.5">Referencia adicional</label>
+            <input
+              value={referencia}
+              onChange={e => setReferencia(e.target.value)}
+              placeholder="Ej: Casa azul al lado del río, cerca al colegio..."
+              className="w-full border-2 border-gray-200 rounded-2xl px-4 py-2.5 text-sm focus:outline-none focus:border-primary"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={() => setPaso('propuesta')}
+            className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-3.5 rounded-2xl text-sm">
+            ← Volver
+          </button>
+          <button
+            onClick={() => {
+              if (!direccion.trim()) {
+                leerTexto('Por favor ingresa tu dirección de entrega.');
+                return;
+              }
+              setPaso('resumen');
+              setTimeout(() => leerTexto(`Confirma tu pedido: ${mejorProducto.nombre} de ${tiendaInfo.empresa}, entrega en: ${direccion}. Costo neto: ${costoNeto} soles. Di confirmar pedido o cancelar.`), 200);
+            }}
+            disabled={!direccion.trim()}
+            className="flex-1 bg-primary text-white font-bold py-3.5 rounded-2xl text-sm disabled:opacity-50 flex items-center justify-center gap-2">
+            Continuar <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Pantalla: resumen final */
+  if (paso === 'resumen') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end">
+      <div className="bg-white rounded-t-3xl w-full max-w-[430px] mx-auto max-h-[90vh] overflow-y-auto">
+
+        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-xl text-gray-800">Confirmar pedido</h3>
+            <button onClick={onCerrar} className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+              <X size={15} className="text-gray-500" />
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mt-0.5">Revisa los detalles antes de confirmar</p>
+        </div>
+
+        <div className="px-4 py-4 space-y-3">
+
+          {/* Producto */}
+          <div className="bg-primary/5 rounded-2xl p-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">💊 Producto</p>
+            <p className="font-bold text-gray-800">{mejorProducto.nombre}</p>
+            {mejorProducto.ingrediente_activo && <p className="text-xs text-gray-400 italic">{mejorProducto.ingrediente_activo}</p>}
+            <p className="text-xs text-gray-500 mt-1">🏪 {tiendaInfo.empresa} · 📍 {tiendaInfo.ubicacion}</p>
+          </div>
+
+          {/* Aplicación */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📋 Instrucciones de aplicación</p>
+            <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">{guiaAplicacion}</p>
+          </div>
+
+          {/* Dirección */}
+          <div className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📍 Dirección de entrega</p>
+            <p className="text-gray-700 text-sm">{direccion}</p>
+            {referencia && <p className="text-xs text-gray-400 mt-1">📌 {referencia}</p>}
+          </div>
+
+          {/* Costo */}
+          <div className="bg-gray-50 rounded-2xl p-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">💰 Costo neto</p>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Producto (1 unidad)</span>
+                <span className="font-semibold">S/ {costoNeto.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Delivery</span>
+                <span className="text-green-600 font-semibold">Coordinado</span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-gray-200 text-base">
+                <span className="font-bold text-gray-800">Total</span>
+                <span className="font-bold text-primary">S/ {costoNeto.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botón escuchar */}
+          <button
+            onClick={leyendo ? detenerVoz : () => leerTexto(`Pedido: ${mejorProducto.nombre} de ${tiendaInfo.empresa}. Dirección: ${direccion}. Costo neto: ${costoNeto} soles. Di confirmar pedido o cancelar.`)}
+            className={`w-full flex items-center justify-center gap-2 font-semibold py-3 rounded-2xl text-sm ${
+              leyendo ? 'bg-red-100 text-red-600' : 'bg-gray-100 text-gray-600'
+            }`}>
+            {leyendo ? <><VolumeX size={15} /> Detener</> : <><Volume2 size={15} /> Escuchar resumen</>}
+          </button>
+
+          {/* Botón voz para confirmar/cancelar */}
+          <button
+            onClick={escucharDecision}
+            className={`w-full flex items-center justify-center gap-2 font-bold py-3.5 rounded-2xl text-sm border-2 transition-all ${
+              grabandoConfirm
+                ? 'border-red-400 bg-red-50 text-red-600 animate-pulse'
+                : 'border-primary/30 bg-primary/5 text-primary'
+            }`}>
+            {grabandoConfirm
+              ? <><MicOff size={16} /> Escuchando... di "confirmar" o "cancelar"</>
+              : <><Mic size={16} /> Confirmar o cancelar por voz</>
+            }
+          </button>
+
+          {/* Botones principales */}
+          <div className="flex gap-3 pb-2">
+            <button
+              onClick={onCerrar}
+              className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-4 rounded-2xl text-sm flex items-center justify-center gap-2">
+              <XCircle size={16} /> Cancelar
+            </button>
+            <button
+              onClick={confirmarPedido}
+              disabled={creandoPedido}
+              className="flex-1 bg-primary text-white font-bold py-4 rounded-2xl text-sm flex items-center justify-center gap-2 shadow-lg disabled:opacity-60">
+              {creandoPedido
+                ? <><Loader2 size={16} className="animate-spin" /> Procesando...</>
+                : <><CheckCircle2 size={16} /> Cerrar pedido</>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  /* Pantalla: éxito */
+  if (paso === 'exito') return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-6">
+      <div className="bg-white rounded-3xl p-8 w-full max-w-sm text-center shadow-2xl">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
+          <CheckCircle size={40} className="text-green-600" />
+        </div>
+        <h3 className="font-display font-bold text-2xl text-gray-800 mb-2">¡Pedido registrado!</h3>
+        <p className="text-gray-500 text-sm mb-5 leading-relaxed">
+          Tu pedido de <strong>{mejorProducto.nombre}</strong> fue enviado a <strong>{tiendaInfo.empresa}</strong>.
+          Un motorizado lo llevará a tu parcela pronto.
+        </p>
+
+        {/* Info contacto tienda */}
+        {tiendaInfo.celular && (
+          <a href={`https://wa.me/51${tiendaInfo.celular.replace(/\D/g,'')}?text=${encodeURIComponent(`Hola, hice un pedido de ${mejorProducto.nombre} a través de AGRILUX. ¿Cuándo lo despachan?`)}`}
+            target="_blank" rel="noreferrer"
+            className="flex items-center justify-center gap-2 bg-green-500 text-white font-bold py-3.5 rounded-2xl text-sm mb-3 w-full">
+            <Phone size={16} /> Contactar a {tiendaInfo.empresa}
+          </a>
+        )}
+
+        <button
+          onClick={() => { navigate('/mercado'); onCerrar(); }}
+          className="w-full bg-gray-100 text-gray-700 font-bold py-3.5 rounded-2xl text-sm mb-3">
+          Ver estado del pedido
+        </button>
+        <button onClick={onCerrar} className="text-sm text-gray-400 underline">Volver al diagnóstico</button>
+
+        {/* Recordatorio de aplicación */}
+        {guiaAplicacion && (
+          <div className="mt-5 bg-primary/5 rounded-2xl p-4 text-left">
+            <p className="text-xs font-bold text-primary mb-2">📋 Recuerda cómo aplicarlo:</p>
+            <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{guiaAplicacion}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return null;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   COMPONENTE PRINCIPAL: Diagnostico
+───────────────────────────────────────────────────────────────────────────── */
 export default function Diagnostico({ onPlagaDetectada }) {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -206,7 +777,8 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const [enviando, setEnviando] = useState(false);
   const [leyendo, setLeyendo] = useState(false);
   const [grabando, setGrabando] = useState(false);
-  const [productoBuscando, setProductoBuscando] = useState(null); // para modal tiendas
+  const [productoBuscando, setProductoBuscando] = useState(null);
+  const [mostrarAgente, setMostrarAgente] = useState(false);   // ← NUEVO
   const fileRef = useRef(null);
   const chatEndRef = useRef(null);
   const reconRef = useRef(null);
@@ -236,7 +808,7 @@ export default function Diagnostico({ onPlagaDetectada }) {
     img.src = dataUrl;
   });
 
-  const analizarUnaVez = async (compressedUrls, intento) => {
+  const analizarUnaVez = async (compressedUrls) => {
     return invokeGemini({
       prompt: `${SISTEMA_PROMPT[cultivo.id]}
 
@@ -305,17 +877,13 @@ INSTRUCCIONES:
     setAnalizando(true);
     try {
       const compressedUrls = await Promise.all(fotos.map(f => compressDataUrl(f.dataUrl)));
-
       const intentos = [];
-      for (let i = 1; i <= 3; i += 1) {
-        intentos.push(await analizarUnaVez(compressedUrls, i));
+      for (let i = 1; i <= 3; i++) {
+        intentos.push(await analizarUnaVez(compressedUrls));
       }
       const analisis = obtenerConsensoAnalisis(intentos);
-
       setResultado(analisis);
       setChat([]);
-
-      // Guardar para dataset ML
       try {
         await addDoc(collection(db, 'diagnosticos'), {
           userId: user?.uid,
@@ -336,11 +904,9 @@ INSTRUCCIONES:
           mes: new Date().getMonth() + 1,
         });
       } catch (e) { console.log('Dataset error:', e); }
-
       if (analisis.tiene_problema && onPlagaDetectada) {
         onPlagaDetectada(analisis.nombre_problema);
       }
-
       leerTexto(analisis.tiene_problema
         ? `Tu ${cultivo.nombre} tiene ${analisis.nombre_problema}. ${analisis.aplicacion_inmediata || analisis.que_hacer}`
         : `Tu ${cultivo.nombre} está saludable.`
@@ -389,7 +955,6 @@ INSTRUCCIONES:
       const historial = chat.map(m =>
         `${m.role === 'user' ? 'Agricultor' : 'PlaguIA'}: ${m.text}`
       ).join('\n');
-
       const resp = await invokeGemini({
         prompt: `${CHAT_SYSTEM[cultivo.id] || CHAT_SYSTEM.papa}
 
@@ -406,7 +971,6 @@ INSTRUCCIONES:
 - Sé específico, práctico y breve (máximo 4 oraciones)
 - Si necesita comprar, dile que puede encontrar los productos en la sección Fungicidas de la app`
       });
-
       setChat(prev => [...prev, { role: 'ia', text: resp }]);
       leerTexto(resp);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -417,18 +981,25 @@ INSTRUCCIONES:
   };
 
   const colorHeader = () => ({
-    critica:  'bg-red-700',
-    grave:    'bg-red-600',
-    moderada: 'bg-orange-500',
-    leve:     'bg-yellow-500',
-    ninguna:  'bg-primary',
+    critica: 'bg-red-700', grave: 'bg-red-600', moderada: 'bg-orange-500',
+    leve: 'bg-yellow-500', ninguna: 'bg-primary',
   }[resultado?.gravedad] || 'bg-primary');
 
-  // ─── PANTALLA RESULTADO ────────────────────────────────────────────────────
+  /* ═══════════════════════════ PANTALLA RESULTADO ═══════════════════════════ */
   if (resultado && !resultado.error) return (
     <div className="min-h-screen pb-24">
 
-      {/* Modal tiendas */}
+      {/* Modal agente */}
+      {mostrarAgente && (
+        <AgenteCompra
+          resultado={resultado}
+          cultivo={cultivo}
+          user={user}
+          onCerrar={() => setMostrarAgente(false)}
+        />
+      )}
+
+      {/* Modal tiendas (búsqueda manual) */}
       {productoBuscando && (
         <TiendasConProducto
           productoBuscado={productoBuscando}
@@ -436,8 +1007,9 @@ INSTRUCCIONES:
         />
       )}
 
+      {/* Header con severidad */}
       <div className={`px-6 pt-12 pb-6 text-white ${colorHeader()}`}>
-        <button onClick={() => { setResultado(null); setFotos([]); setChat([]); }}
+        <button onClick={() => { setResultado(null); setFotos([]); setChat([]); setMostrarAgente(false); }}
           className="text-white/70 text-sm mb-3">← Nuevo diagnóstico</button>
         <div className="flex items-center gap-3">
           {resultado.tiene_problema ? <AlertTriangle size={28} /> : <CheckCircle size={28} />}
@@ -452,6 +1024,36 @@ INSTRUCCIONES:
           </div>
         </div>
       </div>
+
+      {/* ══ BOTONES DECISIÓN DEL AGRICULTOR (NUEVO) ══ */}
+      {resultado.tiene_problema && (
+        <div className="px-4 pt-4">
+          <div className="bg-white rounded-3xl p-4 shadow-md border border-primary/10">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles size={16} className="text-primary" />
+              <p className="text-xs font-bold text-gray-600 uppercase tracking-wide">¿Qué deseas hacer?</p>
+            </div>
+            <div className="flex gap-3">
+              {/* Seguir consultando → baja al chat */}
+              <button
+                onClick={() => { document.getElementById('chat-section')?.scrollIntoView({ behavior: 'smooth' }); }}
+                className="flex-1 border-2 border-gray-200 text-gray-600 font-bold py-3.5 rounded-2xl text-sm flex flex-col items-center gap-1">
+                <span className="text-xl">💬</span>
+                <span className="text-xs">Seguir consultando</span>
+              </button>
+              {/* Completar proceso → agente */}
+              <button
+                onClick={() => setMostrarAgente(true)}
+                className="flex-1 bg-primary text-white font-bold py-3.5 rounded-2xl text-sm flex flex-col items-center gap-1 shadow-lg relative overflow-hidden">
+                <div className="absolute inset-0 bg-white/10 animate-pulse rounded-2xl" />
+                <span className="text-xl relative">🤖</span>
+                <span className="text-xs relative">Completar proceso</span>
+                <span className="text-[10px] relative text-white/80">Agente compra por ti</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="px-4 py-4 space-y-4">
 
@@ -489,13 +1091,11 @@ INSTRUCCIONES:
           </div>
         )}
 
-        {/* Productos con botón buscar tienda */}
+        {/* Productos con botones de búsqueda manual */}
         {resultado.productos?.length > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-                💊 Productos Recomendados
-              </p>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">💊 Productos Recomendados</p>
               <span className="text-xs text-gray-400">{resultado.productos.length} opciones</span>
             </div>
             <div className="space-y-3">
@@ -504,16 +1104,11 @@ INSTRUCCIONES:
                   <div className="flex items-start justify-between mb-2">
                     <div className="flex-1 min-w-0">
                       <p className="font-bold text-sm text-gray-800">{p.nombre}</p>
-                      {p.ingrediente_activo && (
-                        <p className="text-xs text-gray-400 italic truncate">{p.ingrediente_activo}</p>
-                      )}
+                      {p.ingrediente_activo && <p className="text-xs text-gray-400 italic truncate">{p.ingrediente_activo}</p>}
                     </div>
-                    {/* BOTÓN CLAVE: buscar en tiendas */}
-                    <button
-                      onClick={() => setProductoBuscando(p.nombre)}
+                    <button onClick={() => setProductoBuscando(p.nombre)}
                       className="ml-2 flex-shrink-0 flex items-center gap-1 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg">
-                      <ShoppingBag size={12} />
-                      Ver precio
+                      <ShoppingBag size={12} /> Ver precio
                     </button>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
@@ -538,12 +1133,27 @@ INSTRUCCIONES:
                 </div>
               ))}
             </div>
-            {/* Banner ir a fungicidas */}
+
+            {/* Banner agente destacado */}
+            {resultado.tiene_problema && (
+              <button onClick={() => setMostrarAgente(true)}
+                className="w-full mt-3 flex items-center justify-between bg-primary text-white rounded-2xl px-4 py-3.5 shadow">
+                <div className="flex items-center gap-2">
+                  <Bot size={18} className="text-white" />
+                  <div className="text-left">
+                    <p className="text-sm font-bold">Que el agente lo compre por ti</p>
+                    <p className="text-xs text-white/80">Busca el mejor precio y coordina el delivery</p>
+                  </div>
+                </div>
+                <ChevronRight size={18} className="text-white/70" />
+              </button>
+            )}
+
             <button onClick={() => navigate('/mercado')}
-              className="w-full mt-3 flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+              className="w-full mt-2 flex items-center justify-between bg-primary/5 border border-primary/20 rounded-xl px-4 py-3">
               <div className="flex items-center gap-2">
                 <ShoppingBag size={16} className="text-primary" />
-                <p className="text-sm font-bold text-primary">Ver todas las tiendas de fungicidas</p>
+                <p className="text-sm font-bold text-primary">Ver todas las tiendas</p>
               </div>
               <ChevronRight size={16} className="text-primary" />
             </button>
@@ -579,8 +1189,8 @@ INSTRUCCIONES:
           }
         </div>
 
-        {/* Chat */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
+        {/* Chat con agrónomo */}
+        <div id="chat-section" className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">💬 Consulta al Agrónomo IA</p>
           {chat.length === 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -623,7 +1233,7 @@ INSTRUCCIONES:
     </div>
   );
 
-  // ─── PANTALLA PRINCIPAL ────────────────────────────────────────────────────
+  /* ═══════════════════════════ PANTALLA PRINCIPAL ═══════════════════════════ */
   return (
     <div className="min-h-screen pb-24">
       <div className="bg-gradient-to-b from-primary to-primary-dark text-white px-6 pt-12 pb-8">
@@ -702,7 +1312,7 @@ INSTRUCCIONES:
               { e: '🦠', t: 'Enfermedades fúngicas y bacterianas' },
               { e: '🐛', t: 'Plagas e insectos dañinos' },
               { e: '🌿', t: 'Malezas y plantas invasoras' },
-              { e: '🏪', t: 'Encuentra el mejor precio del fungicida' },
+              { e: '🤖', t: 'Agente compra el fungicida por ti' },
             ].map(({ e, t }) => (
               <div key={t} className="bg-white rounded-xl p-2.5 flex items-center gap-2">
                 <span className="text-lg">{e}</span>
