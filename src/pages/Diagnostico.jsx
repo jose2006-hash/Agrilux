@@ -101,15 +101,22 @@ INSTRUCCIONES:
     ) || resultados[0];
   };
 
-  const analizar = async () => {
+ const analizar = async () => {
     if (!fotos.length) { alert('Sube al menos una foto'); return; }
     setAnalizando(true);
     try {
       const compressedUrls = await Promise.all(fotos.map(f => compressDataUrl(f.dataUrl)));
       const intentos = [];
       for (let i = 0; i < 3; i++) intentos.push(await analizarUnaVez(compressedUrls));
-      const analisis = obtenerConsenso(intentos);
 
+      // Si los 3 intentos fallaron (modelo rechazó o no pudo parsear), mostrar error real
+      const todosFallaron = intentos.every(r =>
+        !r.nombre_problema && !r.tiene_problema &&
+        (!r.que_tiene || r.que_tiene.includes('No se pudo') || r.que_tiene.includes('correctamente'))
+      );
+      if (todosFallaron) { setResultado({ error: true }); setAnalizando(false); return; }
+
+      const analisis = obtenerConsenso(intentos);
       setResultado(analisis);
       setChat([]);
 

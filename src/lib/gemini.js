@@ -90,7 +90,7 @@ Responde solo con el JSON puro.`;
     const parsed = extraerJSON(text);
     if (parsed) return parsed;
     // Si no se pudo parsear, retornar objeto de error controlado
-    console.warn('No se pudo parsear JSON de la respuesta:', text.substring(0, 200));
+    console.log('Respuesta no-JSON:', text.substring(0, 200));
     return {
       tiene_problema: false,
       nombre_problema: '',
