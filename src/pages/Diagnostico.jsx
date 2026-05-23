@@ -72,17 +72,16 @@ export default function Diagnostico({ onPlagaDetectada }) {
     invokeGemini({
       prompt: `${SISTEMA_PROMPT[cultivo.id]}
 
-Analiza esta imagen del cultivo de ${cultivo.nombre}.
-Realiza al menos 3 análisis independientes para confirmar el diagnóstico.
-Responde con seguridad.
+Analiza esta fotografía del cultivo de ${cultivo.nombre} y evalúa su estado fitosanitario.
 
 INSTRUCCIONES:
-1. Identifica con precisión la plaga, enfermedad o maleza
-2. En "aplicacion_inmediata": nombre comercial, dosis exacta y frecuencia
-3. Productos: nombres comerciales reales disponibles en Perú (Antracol, Mancozeb, Score, Ridomil, Karate)
-4. Incluye dosis exacta, frecuencia y período de carencia
-5. 2-3 productos alternativos para rotación
-6. Español claro para un agricultor peruano`,
+1. Identifica con precisión cualquier alteración visual: cambios de color, manchas, deformaciones, lesiones
+2. En "aplicacion_inmediata": nombre comercial del producto, dosis exacta y frecuencia de uso
+3. En "productos": nombres comerciales reales disponibles en Perú (Antracol, Mancozeb, Score, Ridomil, Karate)
+4. Incluye dosis exacta, frecuencia y período de carencia de cada producto
+5. Sugiere 2-3 productos alternativos para rotación
+6. Usa español claro para un agricultor peruano
+7. Si la planta se ve completamente sana, indica tiene_problema: false`,
       file_urls: compressedUrls,
       response_json_schema: ANALISIS_SCHEMA,
     });
@@ -101,7 +100,7 @@ INSTRUCCIONES:
     ) || resultados[0];
   };
 
- const analizar = async () => {
+  const analizar = async () => {
     if (!fotos.length) { alert('Sube al menos una foto'); return; }
     setAnalizando(true);
     try {
@@ -109,7 +108,6 @@ INSTRUCCIONES:
       const intentos = [];
       for (let i = 0; i < 3; i++) intentos.push(await analizarUnaVez(compressedUrls));
 
-      // Si los 3 intentos fallaron (modelo rechazó o no pudo parsear), mostrar error real
       const todosFallaron = intentos.every(r =>
         !r.nombre_problema && !r.tiene_problema &&
         (!r.que_tiene || r.que_tiene.includes('No se pudo') || r.que_tiene.includes('correctamente'))
@@ -120,7 +118,6 @@ INSTRUCCIONES:
       setResultado(analisis);
       setChat([]);
 
-      // Guardar en Firestore — FIX: ?? evita undefined
       try {
         await addDoc(collection(db, 'diagnosticos'), {
           userId:        user?.uid    ?? null,
