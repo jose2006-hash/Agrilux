@@ -22,24 +22,51 @@ async function compressImage(dataUrl) {
 function extraerJSON(text) {
   if (!text) return null;
 
-  // 1. Intento directo
-  try { return JSON.parse(text.trim()); } catch {}
+  const limpiaMarkdown = (input) =>
+    input.replace(/```json\s*/gi, '')
+         .replace(/```\s*/g, '')
+         .trim();
 
-  // 2. Quitar bloques markdown ```json ... ```
-  const sinMarkdown = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
-  try { return JSON.parse(sinMarkdown); } catch {}
+  const buscaBalanceado = (input, openChar, closeChar) => {
+    let nivel = 0;
+    let inicio = -1;
+    for (let i = 0; i < input.length; i += 1) {
+      const ch = input[i];
+      if (ch === openChar) {
+        if (nivel === 0) inicio = i;
+        nivel += 1;
+      } else if (ch === closeChar && nivel > 0) {
+        nivel -= 1;
+        if (nivel === 0 && inicio >= 0) {
+          return input.slice(inicio, i + 1);
+        }
+      }
+    }
+    return null;
+  };
 
-  // 3. Extraer el primer objeto JSON { ... } del texto
-  const match = text.match(/\{[\s\S]*\}/);
-  if (match) {
-    try { return JSON.parse(match[0]); } catch {}
-  }
+  const tryParse = (candidate) => {
+    if (!candidate) return null;
+    try { return JSON.parse(candidate); } catch {
+      return null;
+    }
+  };
 
-  // 4. Extraer el primer array JSON [ ... ] del texto
-  const matchArr = text.match(/\[[\s\S]*\]/);
-  if (matchArr) {
-    try { return JSON.parse(matchArr[0]); } catch {}
-  }
+  const trimmed = text.trim();
+  let parsed = tryParse(trimmed);
+  if (parsed) return parsed;
+
+  const withoutMd = limpiaMarkdown(trimmed);
+  parsed = tryParse(withoutMd);
+  if (parsed) return parsed;
+
+  const candidateObject = buscaBalanceado(withoutMd, '{', '}');
+  parsed = tryParse(candidateObject);
+  if (parsed) return parsed;
+
+  const candidateArray = buscaBalanceado(withoutMd, '[', ']');
+  parsed = tryParse(candidateArray);
+  if (parsed) return parsed;
 
   return null;
 }
