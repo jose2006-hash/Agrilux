@@ -29,6 +29,8 @@ export default function Diagnostico({ onPlagaDetectada }) {
 
   const [cultivo, setCultivo]           = useState(CULTIVOS[0]);
   const [fotos, setFotos]               = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [analizando, setAnalizando]     = useState(false);
   const [resultado, setResultado]       = useState(null);
   const [chat, setChat]                 = useState([]);
@@ -47,7 +49,11 @@ export default function Diagnostico({ onPlagaDetectada }) {
     Array.from(e.target.files).forEach(file => {
       const reader = new FileReader();
       reader.onload = () =>
-        setFotos(prev => [...prev, { preview: reader.result, dataUrl: reader.result }]);
+        setFotos(prev => {
+          const next = [...prev, { preview: reader.result, dataUrl: reader.result }];
+          try { setCurrentIndex(next.length - 1); } catch (err) {}
+          return next;
+        });
       reader.readAsDataURL(file);
     });
   };
@@ -484,22 +490,56 @@ INSTRUCCIONES:
               <p className="text-white/50 text-xs mt-2">Puedes subir varias fotos</p>
             </>
           ) : (
-            <div className="grid grid-cols-3 gap-2">
-              {fotos.map((f, i) => (
-                <div key={i} className="relative">
-                  <img src={f.preview} alt="" className="w-full h-20 object-cover rounded-xl" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setFotos(prev => prev.filter((_, j) => j !== i)); }}
-                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
-                    ×
-                  </button>
-                </div>
-              ))}
-              {fotos.length < 4 && (
-                <div className="h-20 border-2 border-dashed border-white/40 rounded-xl flex items-center justify-center text-white/70">
+            <div>
+              <div className="relative">
+                <img
+                  src={fotos[currentIndex]?.preview}
+                  alt="foto principal"
+                  className="w-full h-64 object-contain rounded-xl bg-white p-2 mx-auto"
+                  onClick={(e) => { e.stopPropagation(); setLightboxOpen(true); }}
+                />
+                <button
+                  onClick={(e) => { e.stopPropagation(); setFotos(prev => prev.filter((_, j) => j !== currentIndex)); setCurrentIndex(0); }}
+                  className="absolute top-3 right-3 bg-red-500 text-white rounded-full w-7 h-7 text-xs flex items-center justify-center">
+                  ×
+                </button>
+                {fotos.length > 1 && (
+                  <>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => (i - 1 + fotos.length) % fotos.length); }}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/60 text-gray-800 rounded-full w-9 h-9 flex items-center justify-center">
+                      ‹
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setCurrentIndex(i => (i + 1) % fotos.length); }}
+                      className="absolute right-12 top-1/2 -translate-y-1/2 bg-white/60 text-gray-800 rounded-full w-9 h-9 flex items-center justify-center">
+                      ›
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <div className="flex gap-2 mt-3 overflow-x-auto">
+                {fotos.map((f, i) => (
+                  <div key={i} className={`relative ${i === currentIndex ? 'ring-2 ring-primary rounded-lg' : ''}`}>
+                    <img
+                      src={f.preview}
+                      alt={`thumb-${i}`}
+                      onClick={(e) => { e.stopPropagation(); setCurrentIndex(i); }}
+                      className="w-20 h-20 object-cover rounded-xl cursor-pointer"
+                    />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setFotos(prev => prev.filter((_, j) => j !== i)); setCurrentIndex(0); }}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center">
+                      ×
+                    </button>
+                  </div>
+                ))}
+                <div className="w-20 h-20 border-2 border-dashed border-white/40 rounded-xl flex items-center justify-center text-white/70 cursor-pointer"
+                     onClick={(e) => { e.stopPropagation(); fileRef.current?.click(); }}>
                   <Camera size={20} />
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>
