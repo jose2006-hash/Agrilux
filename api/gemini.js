@@ -1,49 +1,78 @@
-import {
-  callChatCompletions,
-  resolveDeepSeekKey,
-  resolveGeminiKey,
-  resolveLlmRequest,
-} from '../src/lib/llmConfig.js';
+// src/lib/gemini.js
+// Antes usaba Gemini. Ahora usa OpenRouter (Llama 4 Maverick) vía /api/analizar-imagen
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método no permitido' });
-  }
+function extraerJSON(text) {
+  if (!text) return null;
+  const limpiaMarkdown = (input) =>
+    input.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+  const buscaBalanceado = (input, openChar, closeChar) => {
+    let nivel = 0, inicio = -1;
+    for (let i = 0; i < input.length; i++) {
+      if (input[i] === openChar) { if (nivel === 0) inicio = i; nivel++; }
+      else if (input[i] === closeChar && nivel > 0) {
+        nivel--;
+        if (nivel === 0 && inicio >= 0) return input.slice(inicio, i + 1);
+      }
+    }
+    return null;
+  };
+  const tryParse = (c) => { try { return c ? JSON.parse(c) : null; } catch { return null; } };
 
-  const {
-    prompt,
-    file_urls = [],
-    response_json_schema = null,
-    systemPrompt = null,
-  } = req.body || {};
+  const trimmed = text.trim();
+  return tryParse(trimmed)
+    || tryParse(limpiaMarkdown(trimmed))
+    || tryParse(buscaBalanceado(limpiaMarkdown(trimmed), '{', '}'))
+    || tryParse(buscaBalanceado(limpiaMarkdown(trimmed), '[', ']'))
+    || null;
+}
 
-  if (!prompt) return res.status(400).json({ error: 'Prompt requerido' });
+const FALLBACK_DIAGNOSTICO = {
+  tiene_problema: false,
+  nombre_problema: '',
+  nombre_cientifico: '',
+  gravedad: 'ninguna',
+  que_tiene: 'No se pudo analizar la imagen. Sube una foto más clara y bien iluminada.',
+  causa: '',
+  que_hacer: 'Intenta con otra foto donde se vean claramente las hojas, tallos o frutos afectados.',
+  aplicacion_inmediata: '',
+  productos: [],
+  cuando_aplicar: '',
+  prevencion: '',
+  alerta_clima: '',
+};
 
-  const hasImages = file_urls.some((url) => url?.startsWith('data:'));
-  if (hasImages && !resolveGeminiKey(process.env)) {
-    return res.status(500).json({
-      error: 'GEMINI_API_KEY no configurada en Vercel (requerida para imágenes)',
-    });
-  }
-  if (!hasImages && !resolveDeepSeekKey(process.env)) {
-    return res.status(500).json({ error: 'DEEPSEEK_API_KEY no configurada en Vercel' });
-  }
-
+export async function invokeGemini({
+  prompt,
+  file_urls = [],
+  response_json_schema = null,
+  systemPrompt = null,
+}) {
   try {
-    const request = resolveLlmRequest(process.env, {
-      prompt,
-      file_urls,
-      response_json_schema,
-      systemPrompt,
+    const res = await fetch('/api/analizar-imagen', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        images: file_urls, // data:image/jpeg;base64,...
+        prompt,
+        systemPrompt,
+      }),
     });
 
-    const text = await callChatCompletions(request);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || `Error ${res.status}`);
+    }
 
-    return res.status(200).json({
-      choices: [{ message: { content: text } }],
-    });
-  } catch (e) {
-    console.error('Error en handler:', e);
-    return res.status(500).json({ error: 'Error interno', details: e.message });
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || '';
+
+    if (!response_json_schema) return text;
+    return extraerJSON(text) || FALLBACK_DIAGNOSTICO;
+  } catch (err) {
+    console.error('Error en invokeGemini (OpenRouter):', err);
+    if (response_json_schema) return FALLBACK_DIAGNOSTICO;
+    throw err;
   }
 }
+
+export default invokeGemini;
