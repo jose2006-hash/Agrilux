@@ -1,3 +1,4 @@
+// api/analizar-imagen.js
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
 
@@ -19,7 +20,7 @@ export default async function handler(req, res) {
         'X-Title': 'Agrilux',
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-maverick',
+        model: 'google/gemini-2.0-flash-001', // ✅ Cambiado: soporta visión + base64
         messages: [
           ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
           {
@@ -28,7 +29,7 @@ export default async function handler(req, res) {
               { type: 'text', text: prompt },
               ...images.map(img => ({
                 type: 'image_url',
-                image_url: { url: img }, // ya viene como data:image/jpeg;base64,...
+                image_url: { url: img },
               })),
             ],
           },
@@ -39,14 +40,19 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    if (!response.ok)
+
+    // ✅ Log para ver errores reales en Vercel → Logs
+    if (!response.ok) {
+      console.error('OpenRouter error:', JSON.stringify(data));
       return res.status(response.status).json({ error: data.error?.message || 'Error de OpenRouter' });
+    }
 
     const content = data.choices?.[0]?.message?.content;
     if (!content) return res.status(500).json({ error: 'Sin respuesta del modelo' });
 
     return res.status(200).json({ choices: [{ message: { content } }] });
   } catch (err) {
+    console.error('Error interno:', err.message);
     return res.status(500).json({ error: err.message });
   }
 }
