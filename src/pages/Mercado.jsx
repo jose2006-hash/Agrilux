@@ -78,8 +78,7 @@ function SetupTienda({ user, onCreada }) {
 // ─── MODAL SUBIR PRODUCTO ─────────────────────────────────────────────────────
 function ModalProducto({ tiendaId, onClose, onSuccess }) {
   const fileRef = useRef(null);
-  const [foto, setFoto] = useState(null);
-  const [fotoPreview, setFotoPreview] = useState(null);
+  const [fotos, setFotos] = useState([]);
   const [analizando, setAnalizando] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [form, setForm] = useState({
@@ -89,10 +88,13 @@ function ModalProducto({ tiendaId, onClose, onSuccess }) {
   });
 
   const handleFoto = (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { setFoto(reader.result); setFotoPreview(reader.result); };
-    reader.readAsDataURL(file);
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    Promise.all(files.map(file => new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = () => resolve({ dataUrl: reader.result });
+      reader.readAsDataURL(file);
+    }))).then(newFotos => setFotos(prev => [...prev, ...newFotos]));
   };
 
   const compress = (dataUrl) => new Promise(resolve => {
@@ -120,7 +122,7 @@ function ModalProducto({ tiendaId, onClose, onSuccess }) {
 - Modo de uso básico
 - Para qué cultivos es compatible (de esta lista: Papa, Palta, Arándano)
 Responde en español simple para agricultores.`,
-        file_urls: foto ? [await compress(foto)] : [],
+        file_urls: fotos.length ? await Promise.all(fotos.map(f => compress(f.dataUrl))) : [],
         response_json_schema: {
           type: 'object',
           properties: {
@@ -154,7 +156,8 @@ Responde en español simple para agricultores.`,
     try {
       await addDoc(collection(db, 'productos'), {
         ...form,
-        foto: foto || null,
+        foto: fotos[0]?.dataUrl || null,
+        fotos: fotos.map(f => f.dataUrl),
         tiendaId,
         createdAt: new Date().toISOString(),
       });
@@ -171,21 +174,33 @@ Responde en español simple para agricultores.`,
           <button onClick={onClose}><X size={20} className="text-gray-400" /></button>
         </div>
 
-        {/* Foto opcional */}
+        {/* Fotos opcionales */}
         <div className="mb-4">
-          {fotoPreview
-            ? <div className="relative">
-                <img src={fotoPreview} alt="" className="w-full h-32 object-cover rounded-2xl" />
-                <button onClick={() => { setFoto(null); setFotoPreview(null); }}
-                  className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center">×</button>
-              </div>
-            : <div onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center cursor-pointer hover:border-primary transition-colors">
-                <Camera size={28} className="mx-auto text-gray-300 mb-1" />
-                <p className="text-xs text-gray-500">Foto del producto (opcional)</p>
-              </div>
-          }
-          <input ref={fileRef} type="file" accept="image/*" onChange={handleFoto} className="hidden" />
+          <div onClick={() => fileRef.current?.click()}
+            className="border-2 border-dashed border-gray-200 rounded-3xl p-6 text-center cursor-pointer hover:border-primary transition-colors min-h-[220px] flex flex-col items-center justify-center gap-3">
+            <Camera size={28} className="text-gray-300" />
+            <div>
+              <p className="text-sm font-semibold text-gray-700">Foto del producto (opcional)</p>
+              <p className="text-xs text-gray-500">Puedes subir varias fotos</p>
+            </div>
+          </div>
+          {fotos.length > 0 && (
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              {fotos.map((fotoItem, index) => (
+                <div key={index} className="relative rounded-3xl overflow-hidden border border-gray-200">
+                  <img src={fotoItem.dataUrl} alt={`Foto ${index + 1}`} className="w-full h-32 object-cover" />
+                  <button type="button" onClick={(e) => {
+                      e.stopPropagation();
+                      setFotos(prev => prev.filter((_, i) => i !== index));
+                    }}
+                    className="absolute top-3 right-3 bg-black/60 text-white rounded-full w-7 h-7 flex items-center justify-center">
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFoto} className="hidden" />
         </div>
 
         <div className="space-y-3">
@@ -356,7 +371,7 @@ function PanelProveedor({ tienda, onVolver }) {
               ? <div className="bg-white rounded-2xl p-8 text-center"><p className="text-gray-400 text-sm">Aún no has subido productos</p></div>
               : productos.map(p => (
                 <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm">
-                  {p.foto && <img src={p.foto} alt="" className="w-full h-28 object-cover rounded-xl mb-3" />}
+                  { (p.foto || p.fotos?.[0]) && <img src={p.foto || p.fotos[0]} alt="" className="w-full h-28 object-cover rounded-xl mb-3" /> }
                   <div className="flex justify-between items-start">
                     <p className="font-bold text-gray-800">{p.nombre}</p>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${p.disponible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
@@ -628,7 +643,7 @@ function VistaTienda({ tienda, plagaBuscada, user, onVolver }) {
                       <p className="text-xs font-bold text-primary">Recomendado para {plagaBuscada}</p>
                     </div>
                   )}
-                  {p.foto && <img src={p.foto} alt={p.nombre} className="w-full h-36 object-cover rounded-xl mb-3" />}
+                  { (p.foto || p.fotos?.[0]) && <img src={p.foto || p.fotos[0]} alt={p.nombre} className="w-full h-36 object-cover rounded-xl mb-3" /> }
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="font-bold text-gray-800 flex-1">{p.nombre}</h3>
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ml-2 ${p.disponible ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
