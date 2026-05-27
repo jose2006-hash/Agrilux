@@ -80,7 +80,9 @@ export default function Diagnostico({ onPlagaDetectada }) {
       prompt: `Analiza la foto de ${cultivo.nombre} y evalúa su estado fitosanitario.
 Identifica alteraciones visuales (color, manchas, deformaciones, lesiones).
 En aplicacion_inmediata y productos: nombres comerciales reales en Perú (Antracol, Mancozeb, Score, Ridomil, Karate) con dosis, frecuencia y carencia.
-Sugiere 2-3 productos alternativos. Español claro para agricultores. Si está sana: tiene_problema false.`,
+Sugiere 2-3 productos alternativos. Español claro para agricultores. Si está sana: tiene_problema false.
+Responde SOLO con este JSON (sin markdown):
+{"tiene_problema":bool,"nombre_problema":"","nombre_cientifico":"","gravedad":"ninguna|leve|moderada|grave|critica","que_tiene":"","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[{"nombre":"","ingrediente_activo":"","dosis":"","frecuencia":"","carencia":""}],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`,
       file_urls: compressedUrls,
       response_json_schema: ANALISIS_SCHEMA,
     });
