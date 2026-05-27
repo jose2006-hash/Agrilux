@@ -76,18 +76,11 @@ export default function Diagnostico({ onPlagaDetectada }) {
 
   const analizarUnaVez = async (compressedUrls) =>
     invokeGemini({
-      prompt: `${SISTEMA_PROMPT[cultivo.id]}
-
-Analiza esta fotografía del cultivo de ${cultivo.nombre} y evalúa su estado fitosanitario.
-
-INSTRUCCIONES:
-1. Identifica con precisión cualquier alteración visual: cambios de color, manchas, deformaciones, lesiones
-2. En "aplicacion_inmediata": nombre comercial del producto, dosis exacta y frecuencia de uso
-3. En "productos": nombres comerciales reales disponibles en Perú (Antracol, Mancozeb, Score, Ridomil, Karate)
-4. Incluye dosis exacta, frecuencia y período de carencia de cada producto
-5. Sugiere 2-3 productos alternativos para rotación
-6. Usa español claro para un agricultor peruano
-7. Si la planta se ve completamente sana, indica tiene_problema: false`,
+      systemPrompt: SISTEMA_PROMPT[cultivo.id],
+      prompt: `Analiza la foto de ${cultivo.nombre} y evalúa su estado fitosanitario.
+Identifica alteraciones visuales (color, manchas, deformaciones, lesiones).
+En aplicacion_inmediata y productos: nombres comerciales reales en Perú (Antracol, Mancozeb, Score, Ridomil, Karate) con dosis, frecuencia y carencia.
+Sugiere 2-3 productos alternativos. Español claro para agricultores. Si está sana: tiene_problema false.`,
       file_urls: compressedUrls,
       response_json_schema: ANALISIS_SCHEMA,
     });
@@ -197,20 +190,12 @@ INSTRUCCIONES:
         .join('\n');
 
       const resp = await invokeGemini({
-        prompt: `${CHAT_SYSTEM[cultivo.id] || CHAT_SYSTEM.papa}
-
-Diagnóstico: ${resultado?.nombre_problema || 'saludable'} en ${cultivo.nombre}. Gravedad: ${resultado?.gravedad || 'ninguna'}.
-
+        systemPrompt: CHAT_SYSTEM[cultivo.id] || CHAT_SYSTEM.papa,
+        prompt: `Diagnóstico: ${resultado?.nombre_problema || 'saludable'} en ${cultivo.nombre}. Gravedad: ${resultado?.gravedad || 'ninguna'}.
 Historial:
 ${historial}
-
 Pregunta: ${p}
-
-INSTRUCCIONES:
-- Nombre comercial + dosis exacta + período de carencia si pregunta por producto
-- Considera clima de la zona si menciona ubicación en Perú
-- Breve y práctico (máx 4 oraciones)
-- Si necesita comprar, menciona la sección Fungicidas de la app`,
+Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungicidas en la app si necesita comprar.`,
       });
 
       setChat(prev => [...prev, { role: 'ia', text: resp }]);
