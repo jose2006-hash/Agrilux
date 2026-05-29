@@ -211,7 +211,7 @@ Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungi
 
   /* ═══════════════ PANTALLA RESULTADO ═══════════════ */
   if (resultado && !resultado.error) return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-32">
 
       {mostrarAgente && (
         <AgenteCompra
@@ -456,7 +456,7 @@ Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungi
 
   /* ═══════════════ PANTALLA UPLOAD ═══════════════ */
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-32">
       <div className="bg-gradient-to-b from-primary to-primary-dark text-white px-6 pt-12 pb-8">
         <div className="text-center mb-6">
           <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mx-auto mb-4">

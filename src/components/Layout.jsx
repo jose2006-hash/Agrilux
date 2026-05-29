@@ -45,7 +45,7 @@ export default function Layout({ children }) {
         </div>
       </div>
 
-      <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
+      <main className="flex-1 pb-28 overflow-y-auto">{children}</main>
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-100 shadow-lg z-50">
         <div className="flex">
           {navItems.map(({ path, icon: Icon, label }) => {
