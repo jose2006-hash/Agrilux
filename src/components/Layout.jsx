@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Camera, ShieldCheck } from 'lucide-react';
+import { Camera, ShieldCheck, LogOut, Menu, X } from 'lucide-react';
+import { useAuth } from '../lib/AuthContext';
 
 const navItems = [
   { path: '/',        icon: Camera,      label: 'Diagnóstico' },
@@ -10,9 +11,40 @@ const navItems = [
 export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleLogout = async () => {
+    await logout();
+    setMenuOpen(false);
+    navigate('/');
+  };
 
   return (
     <div className="flex flex-col min-h-screen max-w-[430px] mx-auto">
+      <div className="flex justify-between items-center px-4 py-3 bg-white border-b border-gray-100 sticky top-0 z-40">
+        <div className="text-sm font-semibold text-gray-700">
+          {user?.nombre ? `Hola, ${user.nombre.split(' ')[0]}` : 'Agrilux'}
+        </div>
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen(!menuOpen)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            {menuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 z-50">
+              <button
+                onClick={handleLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-medium rounded-lg">
+                <LogOut size={18} />
+                Cerrar sesión
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       <main className="flex-1 pb-20 overflow-y-auto">{children}</main>
       <nav className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] bg-white border-t border-gray-100 shadow-lg z-50">
         <div className="flex">

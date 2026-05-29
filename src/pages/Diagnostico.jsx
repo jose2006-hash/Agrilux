@@ -553,13 +553,18 @@ Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungi
 
         <button
           onClick={analizar} disabled={!fotos.length || analizando}
-          className="w-full bg-primary text-white font-bold py-5 rounded-2xl disabled:opacity-50 text-lg shadow-lg">
-          {analizando
-            ? <span className="flex items-center justify-center gap-2">
-                <Loader2 size={22} className="animate-spin" /> Analizando con PlaguIA...
-              </span>
-            : '🔬 Iniciar Diagnóstico'
-          }
+          className="w-full bg-gradient-to-r from-primary to-primary-dark text-white font-bold py-6 rounded-2xl disabled:opacity-50 text-lg shadow-xl hover:shadow-2xl hover:scale-105 transition-all active:scale-95 relative overflow-hidden group">
+          <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="relative">
+            {analizando
+              ? <span className="flex items-center justify-center gap-2">
+                  <Loader2 size={24} className="animate-spin" /> Analizando con PlaguIA...
+                </span>
+              : <span className="flex items-center justify-center gap-2 text-lg">
+                  <span>🔬</span> Iniciar Diagnóstico
+                </span>
+            }
+          </div>
         </button>
 
         {resultado?.error && (
