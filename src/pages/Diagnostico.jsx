@@ -36,6 +36,7 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const [chat, setChat]                 = useState([]);
   const [pregunta, setPregunta]         = useState('');
   const [enviando, setEnviando]         = useState(false);
+  const [consultandoSinFoto, setConsultandoSinFoto] = useState(false);
   const [leyendo, setLeyendo]           = useState(false);
   const [grabando, setGrabando]         = useState(false);
   const [productoBuscando, setProductoBuscando] = useState(null);
@@ -191,13 +192,21 @@ Responde SOLO con este JSON (sin markdown):
         .map(m => `${m.role === 'user' ? 'Agricultor' : 'PlaguIA'}: ${m.text}`)
         .join('\n');
 
-      const resp = await invokeGemini({
-        systemPrompt: CHAT_SYSTEM[cultivo.id] || CHAT_SYSTEM.papa,
-        prompt: `Diagnóstico: ${resultado?.nombre_problema || 'saludable'} en ${cultivo.nombre}. Gravedad: ${resultado?.gravedad || 'ninguna'}.
+      const promptBase = resultado
+        ? `Diagnóstico: ${resultado.nombre_problema || 'saludable'} en ${cultivo.nombre}. Gravedad: ${resultado.gravedad || 'ninguna'}.
 Historial:
 ${historial}
 Pregunta: ${p}
-Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungicidas en la app si necesita comprar.`,
+Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungicidas en la app si necesita comprar.`
+        : `Eres un agrónomo experto. El agricultor hace una consulta sin enviar foto. Cultivo: ${cultivo.nombre}.
+Historial:
+${historial}
+Pregunta: ${p}
+Responde breve (máx 4 oraciones) con recomendaciones prácticas. Indica si sería mejor tener una foto para precisar el diagnóstico.`;
+
+      const resp = await invokeGemini({
+        systemPrompt: CHAT_SYSTEM[cultivo.id] || CHAT_SYSTEM.papa,
+        prompt: promptBase,
       });
 
       setChat(prev => [...prev, { role: 'ia', text: resp }]);
@@ -572,6 +581,53 @@ Responde breve (máx 4 oraciones) con dosis y carencia si aplica. Menciona Fungi
             <AlertTriangle size={32} className="mx-auto text-red-400 mb-2" />
             <p className="text-red-600 font-semibold text-sm">Error en el análisis</p>
             <p className="text-red-400 text-xs mt-1">Intenta con una foto más clara y bien iluminada</p>
+          </div>
+        )}
+
+        <button
+          onClick={() => { setConsultandoSinFoto(true); setChat([]); }}
+          className="w-full bg-white border border-primary/20 text-primary font-semibold py-4 rounded-2xl shadow-sm hover:bg-primary/5 transition-colors">
+          💬 Consultar sin foto
+        </button>
+
+        {consultandoSinFoto && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm mt-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">💬 Consulta sin foto</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {['¿Qué fungicida aplico?', '¿Cuánto producto necesito?', '¿Cuándo volver a aplicar?'].map(s => (
+                <button key={s} onClick={() => setPregunta(s)}
+                  className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <input
+                value={pregunta} onChange={e => setPregunta(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && enviarPregunta()}
+                placeholder="Ej: ¿Qué tratamiento usar sin foto?"
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+              />
+              <button
+                onClick={enviarPregunta} disabled={!pregunta.trim() || enviando}
+                className="bg-primary text-white p-2.5 rounded-xl disabled:opacity-50">
+                {enviando ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              </button>
+            </div>
+
+            {chat.length > 0 && (
+              <div className="space-y-2 mt-4 max-h-72 overflow-y-auto">
+                {chat.map((m, i) => (
+                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                      m.role === 'user' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-800'
+                    }`}>{m.text}</div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+            )}
           </div>
         )}
 

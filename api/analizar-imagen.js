@@ -7,10 +7,18 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'OPENROUTER_API_KEY no configurada en Vercel' });
 
   const { images, prompt, systemPrompt } = req.body;
-  if (!images?.length || !prompt)
-    return res.status(400).json({ error: 'Faltan campos: images o prompt' });
+  if (!prompt)
+    return res.status(400).json({ error: 'Falta el campo prompt' });
 
   try {
+    const userContent = [
+      { type: 'text', text: prompt },
+      ...(Array.isArray(images) ? images.map(img => ({
+        type: 'image_url',
+        image_url: { url: img },
+      })) : []),
+    ];
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -25,13 +33,7 @@ export default async function handler(req, res) {
           ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
           {
             role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              ...images.map(img => ({
-                type: 'image_url',
-                image_url: { url: img },
-              })),
-            ],
+            content: userContent,
           },
         ],
         max_tokens: 1500,
