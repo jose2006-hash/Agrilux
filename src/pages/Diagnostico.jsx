@@ -6,6 +6,16 @@ import {
 } from 'lucide-react';
 import { useAuth }       from '../lib/AuthContext';
 import { invokeGemini }  from '../lib/gemini';
+import {
+  geocodePlace,
+  getWeather,
+  identifyPlantDisease,
+  getSoilData,
+  getNasaAlerts,
+  getSentinelNDVI,
+  sendWhatsApp,
+  getMapboxStaticMap,
+} from '../lib/externalApis';
 import { CULTIVOS }      from '../lib/constants';
 import { db }            from '../lib/firebase';
 import { collection, addDoc } from 'firebase/firestore';
@@ -37,10 +47,24 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const [pregunta, setPregunta]         = useState('');
   const [enviando, setEnviando]         = useState(false);
   const [consultandoSinFoto, setConsultandoSinFoto] = useState(false);
+  const [ubicacion, setUbicacion]       = useState('');
+  const [locationInfo, setLocationInfo] = useState(null);
+  const [weather, setWeather]           = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [plantDiagnosis, setPlantDiagnosis] = useState(null);
+  const [plantIdentificando, setPlantIdentificando] = useState(false);
   const [leyendo, setLeyendo]           = useState(false);
   const [grabando, setGrabando]         = useState(false);
   const [productoBuscando, setProductoBuscando] = useState(null);
   const [mostrarAgente, setMostrarAgente]       = useState(false);
+
+  // ── Nuevos estados ──────────────────────────────────────────────────────────
+  const [soilData, setSoilData]                     = useState(null);
+  const [nasaAlerts, setNasaAlerts]                 = useState(null);
+  const [sentinelNDVI, setSentinelNDVI]             = useState(null);
+  const [soilLoading, setSoilLoading]               = useState(false);
+  const [enviandoWhatsApp, setEnviandoWhatsApp]     = useState(false);
+  const [whatsAppEnviado, setWhatsAppEnviado]       = useState(false);
 
   const fileRef    = useRef(null);
   const chatEndRef = useRef(null);
@@ -102,11 +126,45 @@ Responde SOLO con este JSON (sin markdown):
     ) || resultados[0];
   };
 
+  // ── Carga datos enriquecidos cuando hay coordenadas ─────────────────────────
+  const cargarDatosEnriquecidos = async (lat, lon) => {
+    setSoilLoading(true);
+    try {
+      const [soil, nasa] = await Promise.allSettled([
+        getSoilData(lat, lon),
+        getNasaAlerts(lat, lon),
+      ]);
+      if (soil.status === 'fulfilled') setSoilData(soil.value);
+      if (nasa.status === 'fulfilled') setNasaAlerts(nasa.value);
+
+      try {
+        const ndvi = await getSentinelNDVI(lat, lon, 2);
+        setSentinelNDVI(ndvi);
+      } catch (e) {
+        console.warn('NDVI no disponible:', e.message);
+      }
+    } catch (e) {
+      console.warn('Error cargando datos enriquecidos:', e.message);
+    }
+    setSoilLoading(false);
+  };
+
   const analizar = async () => {
     if (!fotos.length) { alert('Sube al menos una foto'); return; }
     setAnalizando(true);
+    setPlantDiagnosis(null);
     try {
       const compressedUrls = await Promise.all(fotos.map(f => compressDataUrl(f.dataUrl)));
+      setPlantIdentificando(true);
+      try {
+        const plantData = await identifyPlantDisease(compressedUrls);
+        if (plantData) setPlantDiagnosis(plantData);
+      } catch (err) {
+        console.warn('Plant disease detection failed:', err);
+      } finally {
+        setPlantIdentificando(false);
+      }
+
       const intentos = [];
       for (let i = 0; i < 3; i++) intentos.push(await analizarUnaVez(compressedUrls));
 
@@ -167,6 +225,27 @@ Responde SOLO con este JSON (sin markdown):
   };
   const detenerVoz = () => { window.speechSynthesis?.cancel(); setLeyendo(false); };
 
+  const buscarClima = async () => {
+    if (!ubicacion.trim()) return;
+    setWeatherLoading(true);
+    setWeather(null);
+    setLocationInfo(null);
+
+    try {
+      const place = await geocodePlace(ubicacion.trim());
+      setLocationInfo(place);
+      const clima = await getWeather(place.lat, place.lon, place.name);
+      setWeather(clima);
+      // ── Cargar datos enriquecidos con las coordenadas obtenidas ──────────
+      await cargarDatosEnriquecidos(place.lat, place.lon);
+    } catch (err) {
+      console.error(err);
+      alert(err.message || 'No se pudo obtener el clima');
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
+
   const grabarVoz = () => {
     if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
       alert('Usa Chrome para la función de voz'); return;
@@ -218,6 +297,36 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas. Indica si ser�
     setEnviando(false);
   };
 
+  // ── Enviar diagnóstico por WhatsApp ─────────────────────────────────────────
+  const enviarDiagnosticoPorWhatsApp = async () => {
+    if (!user?.celular && !user?.phone) {
+      alert('Agrega tu número de celular en tu perfil para recibir el diagnóstico por WhatsApp.');
+      return;
+    }
+    const telefono = (user.celular || user.phone || '').replace(/\D/g, '');
+    if (telefono.length < 9) {
+      alert('Número de celular inválido en tu perfil.');
+      return;
+    }
+
+    setEnviandoWhatsApp(true);
+    try {
+      await sendWhatsApp(telefono, 'diagnostico', {
+        cultivo: cultivo.nombre,
+        problema: resultado.nombre_problema,
+        gravedad: resultado.gravedad,
+        accion: resultado.aplicacion_inmediata || resultado.que_hacer,
+        productos: resultado.productos || [],
+      });
+      setWhatsAppEnviado(true);
+      setTimeout(() => setWhatsAppEnviado(false), 5000);
+    } catch (e) {
+      console.error('WhatsApp error:', e.message);
+      alert('No se pudo enviar el WhatsApp. Verifica tu número en el perfil.');
+    }
+    setEnviandoWhatsApp(false);
+  };
+
   /* ═══════════════ PANTALLA RESULTADO ═══════════════ */
   if (resultado && !resultado.error) return (
     <div className="min-h-screen pb-32">
@@ -238,7 +347,16 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas. Indica si ser�
 
       <div className={`px-6 pt-12 pb-6 text-white ${COLOR_HEADER[resultado.gravedad] || 'bg-primary'}`}>
         <button
-          onClick={() => { setResultado(null); setFotos([]); setChat([]); setMostrarAgente(false); }}
+          onClick={() => {
+            setResultado(null);
+            setFotos([]);
+            setChat([]);
+            setMostrarAgente(false);
+            setSoilData(null);
+            setNasaAlerts(null);
+            setSentinelNDVI(null);
+            setWhatsAppEnviado(false);
+          }}
           className="text-white/70 text-sm mb-3">
           ← Nuevo diagnóstico
         </button>
@@ -255,6 +373,190 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas. Indica si ser�
           </div>
         </div>
       </div>
+
+      {weather && (
+        <div className="px-4 py-4">
+          <div className="bg-blue-50 rounded-2xl p-4 shadow-sm border border-blue-100">
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-wide mb-2">🌦️ Clima informado</p>
+            <p className="text-sm text-blue-800 font-semibold mb-2">{weather.location.name}</p>
+            <p className="text-sm text-gray-700 mb-1">Temperatura actual: {weather.current?.temperature ?? weather.current?.temp}°C</p>
+            <p className="text-sm text-gray-600">{weather.source === 'openweathermap' ? weather.current?.weather?.[0]?.description : 'Datos meteorológicos gratuitos disponibles'}</p>
+          </div>
+        </div>
+      )}
+
+      {/* MAPA SATELITAL NDVI */}
+      {sentinelNDVI?.ndvi_image && (
+        <div className="px-4 py-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+              🛰 Imagen satelital de tu parcela (NDVI)
+            </p>
+            <img
+              src={sentinelNDVI.ndvi_image}
+              alt="NDVI Sentinel-2"
+              className="w-full rounded-xl border border-gray-100"
+            />
+            <div className="flex justify-between mt-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-green-500 rounded-sm" /> Sano
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-yellow-400 rounded-sm" /> Estrés leve
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 bg-red-500 rounded-sm" /> Estrés severo
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              Sentinel-2 ESA · Resolución 10m · Últimas 4 semanas
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ALERTAS NASA */}
+      {nasaAlerts && nasaAlerts.riesgo !== 'ninguno' && (
+        <div className="px-4">
+          <div className={`rounded-2xl p-4 border ${
+            nasaAlerts.riesgo === 'alto'
+              ? 'bg-red-50 border-red-300'
+              : 'bg-orange-50 border-orange-200'
+          }`}>
+            <p className={`text-xs font-bold uppercase tracking-wide mb-1 ${
+              nasaAlerts.riesgo === 'alto' ? 'text-red-600' : 'text-orange-600'
+            }`}>
+              🛰 Alerta NASA FIRMS
+            </p>
+            <p className={`text-sm ${
+              nasaAlerts.riesgo === 'alto' ? 'text-red-700' : 'text-orange-700'
+            }`}>
+              {nasaAlerts.alerta}
+            </p>
+            <a
+              href={nasaAlerts.mapa_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-blue-500 underline mt-2 inline-block"
+            >
+              Ver en mapa NASA →
+            </a>
+          </div>
+        </div>
+      )}
+
+      {/* DATOS DE SUELO */}
+      {soilData?.suelo && (
+        <div className="px-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">
+              🪱 Análisis de suelo (SoilGrids ISRIC)
+            </p>
+
+            {soilData.suelo.ph.valor && (
+              <div className="bg-gray-50 rounded-xl p-3 mb-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-700">
+                    pH del suelo
+                  </span>
+                  <span className={`text-sm font-bold ${
+                    soilData.suelo.ph.nivel === 'Óptimo' || soilData.suelo.ph.nivel?.includes('Neutro')
+                      ? 'text-green-600'
+                      : soilData.suelo.ph.nivel?.includes('ácido') || soilData.suelo.ph.nivel?.includes('Ácido')
+                      ? 'text-orange-500'
+                      : 'text-gray-700'
+                  }`}>
+                    {soilData.suelo.ph.valor?.toFixed(1)} — {soilData.suelo.ph.nivel}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {soilData.suelo.ph.recomendacion}
+                </p>
+              </div>
+            )}
+
+            {soilData.suelo.carbono_organico.valor && (
+              <div className="bg-gray-50 rounded-xl p-3 mb-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-gray-700">
+                    Materia orgánica
+                  </span>
+                  <span className="text-sm font-bold text-gray-700">
+                    {soilData.suelo.carbono_organico.valor}% — {soilData.suelo.carbono_organico.nivel}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {soilData.suelo.carbono_organico.recomendacion}
+                </p>
+              </div>
+            )}
+
+            {soilData.suelo.textura.arcilla && (
+              <div className="grid grid-cols-3 gap-2 mt-2">
+                {[
+                  { label: 'Arcilla', value: soilData.suelo.textura.arcilla },
+                  { label: 'Arena',   value: soilData.suelo.textura.arena   },
+                  { label: 'Limo',    value: soilData.suelo.textura.limo    },
+                ].map(({ label, value }) => value && (
+                  <div key={label} className="bg-amber-50 rounded-lg p-2 text-center">
+                    <p className="text-xs text-amber-600 font-bold">{label}</p>
+                    <p className="text-xs text-gray-700 font-semibold">{value}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* BOTÓN WHATSAPP */}
+      {resultado.tiene_problema && (
+        <div className="px-4">
+          <button
+            onClick={enviarDiagnosticoPorWhatsApp}
+            disabled={enviandoWhatsApp || whatsAppEnviado}
+            className={`w-full flex items-center justify-center gap-2 font-bold py-3.5 rounded-2xl text-sm transition-all ${
+              whatsAppEnviado
+                ? 'bg-green-100 text-green-700'
+                : 'bg-green-500 text-white shadow-lg hover:bg-green-600'
+            } disabled:opacity-60`}
+          >
+            {enviandoWhatsApp ? (
+              <>⏳ Enviando...</>
+            ) : whatsAppEnviado ? (
+              <>✅ ¡Diagnóstico enviado a tu WhatsApp!</>
+            ) : (
+              <>📲 Enviar diagnóstico a mi WhatsApp</>
+            )}
+          </button>
+          <p className="text-xs text-gray-400 text-center mt-1">
+            Recibirás el resumen en tu celular registrado
+          </p>
+        </div>
+      )}
+
+      {plantDiagnosis && (
+        <div className="px-4 py-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">🔬 Análisis complementario</p>
+            {plantDiagnosis.data?.suggestions?.length > 0 ? (
+              <div className="space-y-3">
+                {plantDiagnosis.data.suggestions.slice(0, 3).map((item, i) => (
+                  <div key={i} className="rounded-2xl bg-slate-50 p-3 border border-gray-200">
+                    <p className="font-semibold text-sm text-gray-800">{item.plant_name || item.name}</p>
+                    <p className="text-xs text-gray-500 mt-1">{item.plant_details?.common_names?.join(', ') || ''}</p>
+                    {item.probability != null && (
+                      <p className="text-xs text-gray-600 mt-2">Confianza: {(item.probability * 100).toFixed(0)}%</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-600">No se encontró una sugerencia clara de planta/enfermedad.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       {resultado.tiene_problema && (
         <div className="px-4 pt-4">
@@ -543,6 +845,47 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas. Indica si ser�
       </div>
 
       <div className="px-4 py-4 space-y-4">
+        <div className="bg-white rounded-3xl p-4 shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">🌦️ Clima de tu parcela</p>
+            <span className="text-xs text-gray-400">API gratuita</span>
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={ubicacion} onChange={e => setUbicacion(e.target.value)}
+              placeholder="Distrito, ciudad o parcela"
+              className="flex-1 border border-gray-200 rounded-2xl px-3 py-2 text-sm focus:outline-none focus:border-primary"
+            />
+            <button
+              onClick={buscarClima}
+              disabled={weatherLoading}
+              className="bg-primary text-white px-4 rounded-2xl text-sm font-semibold disabled:opacity-50">
+              {weatherLoading ? 'Buscando...' : 'Buscar'}
+            </button>
+          </div>
+          {weather && (
+            <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-gray-700">
+              <p className="font-semibold text-gray-800">{weather.location.name}</p>
+              <p className="mt-2">Temperatura actual: {weather.current?.temperature ?? weather.current?.temp}°C</p>
+              <p>{weather.source === 'openweathermap' ? weather.current?.weather?.[0]?.description : 'Datos de clima local disponibles'}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {(weather.daily?.temperature_2m_max || weather.daily?.temp_max) && (
+                  <div className="rounded-2xl bg-white p-3 border border-gray-100">
+                    <p className="text-[10px] uppercase text-gray-400">Máx.</p>
+                    <p className="font-semibold text-gray-800">{weather.daily.temperature_2m_max?.[0] ?? weather.daily.temp_max?.[0]}°C</p>
+                  </div>
+                )}
+                {(weather.daily?.temperature_2m_min || weather.daily?.temp_min) && (
+                  <div className="rounded-2xl bg-white p-3 border border-gray-100">
+                    <p className="text-[10px] uppercase text-gray-400">Mín.</p>
+                    <p className="font-semibold text-gray-800">{weather.daily.temperature_2m_min?.[0] ?? weather.daily.temp_min?.[0]}°C</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">¿Qué cultivo es?</p>
           <div className="flex gap-3 justify-center">
