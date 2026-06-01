@@ -1,8 +1,11 @@
 /**
  * src/lib/AuthContext.jsx
  *
- * Registro: nombre completo + correo + contraseña
- * Login:    correo + contraseña
+ * Registro: nombre completo + correo + DNI
+ * Login:    correo + DNI
+ *
+ * El DNI se usa internamente como contraseña en Firebase Auth.
+ * El usuario nunca ve ni escucha la palabra "contraseña".
  */
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
@@ -41,24 +44,26 @@ export const AuthProvider = ({ children }) => {
     return () => unsub();
   }, []);
 
-  // ── Registro: nombre + email + contraseña ────────────────────────────────
-  const register = async ({ nombre, email, password }) => {
-    const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
+  // ── Registro: nombre + email + DNI ───────────────────────────────────────
+  const register = async ({ nombre, email, dni }) => {
+    // El DNI actúa como contraseña en Firebase (mínimo 6 chars — DNI tiene 8)
+    const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), dni);
     await updateProfile(cred.user, { displayName: nombre.trim() });
     await setDoc(doc(db, 'usuarios', cred.user.uid), {
       nombre:    nombre.trim(),
       email:     email.trim().toLowerCase(),
+      dni,                          // guardamos el DNI para referencia
       rol:       'agricultor',
       creadoPor: 'self',
       createdAt: new Date().toISOString(),
     });
-    setUser({ uid: cred.user.uid, email: email.trim(), nombre: nombre.trim(), rol: 'agricultor' });
+    setUser({ uid: cred.user.uid, email: email.trim(), nombre: nombre.trim(), dni, rol: 'agricultor' });
     return cred.user;
   };
 
-  // ── Login: email + contraseña ────────────────────────────────────────────
-  const login = async ({ email, password }) => {
-    const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+  // ── Login: email + DNI ───────────────────────────────────────────────────
+  const login = async ({ email, dni }) => {
+    const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), dni);
     return cred.user;
   };
 

@@ -1,24 +1,23 @@
 /**
  * src/pages/Registro.jsx
  *
- * Registro: nombre completo + correo + contraseña
- * Login:    correo + contraseña
- * Admin:    enlace discreto al pie → lleva a /admin
+ * Registro: nombre completo + correo + número DNI
+ * Login:    correo + número DNI
  */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
-import { Loader2, Eye, EyeOff, User, Mail, Lock } from 'lucide-react';
+import { Loader2, Eye, EyeOff, User, Mail, CreditCard } from 'lucide-react';
 
 const ERRORES = {
-  'auth/email-already-in-use':  'Este correo ya está registrado. Inicia sesión.',
-  'auth/invalid-email':         'El correo no es válido.',
-  'auth/weak-password':         'La contraseña debe tener al menos 6 caracteres.',
-  'auth/user-not-found':        'No existe cuenta con ese correo.',
-  'auth/wrong-password':        'Contraseña incorrecta.',
-  'auth/invalid-credential':    'Correo o contraseña incorrectos.',
-  'auth/too-many-requests':     'Demasiados intentos. Espera unos minutos.',
+  'auth/email-already-in-use': 'Este correo ya está registrado. Inicia sesión.',
+  'auth/invalid-email':        'El correo no es válido.',
+  'auth/weak-password':        'DNI inválido.',
+  'auth/user-not-found':       'No existe cuenta con ese correo.',
+  'auth/wrong-password':       'DNI incorrecto.',
+  'auth/invalid-credential':   'Correo o DNI incorrectos.',
+  'auth/too-many-requests':    'Demasiados intentos. Espera unos minutos.',
 };
 
 function msgError(code) {
@@ -32,35 +31,38 @@ export default function Registro() {
   const [modo, setModo]       = useState('login');
   const [nombre, setNombre]   = useState('');
   const [email, setEmail]     = useState('');
-  const [password, setPass]   = useState('');
-  const [verPass, setVerPass] = useState(false);
+  const [dni, setDni]         = useState('');
+  const [verDni, setVerDni]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
 
   const cambiarModo = (m) => {
     setModo(m); setError('');
-    setNombre(''); setEmail(''); setPass('');
+    setNombre(''); setEmail(''); setDni('');
+  };
+
+  // Solo permite dígitos en el campo DNI, máximo 8
+  const handleDni = (val) => {
+    const solo = val.replace(/\D/g, '').slice(0, 8);
+    setDni(solo);
   };
 
   const handleSubmit = async () => {
     setError('');
 
-    // Validaciones
     if (modo === 'registro' && !nombre.trim()) {
       setError('Ingresa tu nombre completo.'); return;
     }
-    if (!email.trim()) { setError('Ingresa tu correo.'); return; }
-    if (!password)     { setError('Ingresa tu contraseña.'); return; }
-    if (modo === 'registro' && password.length < 6) {
-      setError('La contraseña debe tener al menos 6 caracteres.'); return;
-    }
+    if (!email.trim()) { setError('Ingresa tu correo electrónico.'); return; }
+    if (!dni)          { setError('Ingresa tu número de DNI.'); return; }
+    if (dni.length !== 8) { setError('El DNI debe tener exactamente 8 dígitos.'); return; }
 
     setLoading(true);
     try {
       if (modo === 'registro') {
-        await register({ nombre: nombre.trim(), email, password });
+        await register({ nombre: nombre.trim(), email, dni });
       } else {
-        await login({ email, password });
+        await login({ email, dni });
       }
     } catch (e) {
       setError(msgError(e.code));
@@ -142,34 +144,55 @@ export default function Registro() {
                 placeholder="tucorreo@gmail.com"
                 className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
                 autoComplete="email"
+                inputMode="email"
               />
             </div>
           </div>
 
-          {/* Contraseña */}
+          {/* DNI */}
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-              Contraseña
+              Número de DNI
             </label>
             <div className="relative">
-              <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+              <CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
               <input
-                type={verPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPass(e.target.value)}
+                type={verDni ? 'text' : 'password'}
+                value={dni}
+                onChange={e => handleDni(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                placeholder={modo === 'registro' ? 'Mínimo 6 caracteres' : '••••••••'}
-                className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-12 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
-                autoComplete={modo === 'registro' ? 'new-password' : 'current-password'}
+                placeholder="8 dígitos"
+                maxLength={8}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-12 py-3 text-sm focus:outline-none focus:border-primary transition-colors tracking-widest"
+                autoComplete="off"
               />
               <button
                 type="button"
-                onClick={() => setVerPass(v => !v)}
+                onClick={() => setVerDni(v => !v)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
               >
-                {verPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                {verDni ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
+            {/* Indicador de dígitos ingresados */}
+            <div className="flex gap-1 mt-2 px-1">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className={`flex-1 h-1 rounded-full transition-all ${
+                    i < dni.length ? 'bg-primary' : 'bg-gray-100'
+                  }`}
+                />
+              ))}
+            </div>
+            {dni.length > 0 && dni.length < 8 && (
+              <p className="text-xs text-gray-400 mt-1 ml-1">{dni.length}/8 dígitos</p>
+            )}
+            {dni.length === 8 && (
+              <p className="text-xs text-green-500 mt-1 ml-1">✓ DNI completo</p>
+            )}
           </div>
 
           {/* Botón principal */}
@@ -188,12 +211,12 @@ export default function Registro() {
 
           {modo === 'registro' && (
             <p className="text-xs text-gray-400 text-center">
-              Tus datos se guardan de forma segura y ayudan a mejorar la IA agrícola
+              Tu DNI es tu clave de acceso. No lo compartas con nadie.
             </p>
           )}
         </div>
 
-        {/* Pie: ayuda + acceso admin discreto */}
+        {/* Pie */}
         <div className="mt-6 flex items-center justify-between">
           <p className="text-xs text-gray-400">
             ¿Ayuda?{' '}
@@ -206,8 +229,7 @@ export default function Registro() {
               935 211 605
             </a>
           </p>
-
-          {/* Acceso admin — discreto, sin llamar la atención */}
+          {/* Acceso admin — discreto */}
           <button
             onClick={() => navigate('/admin')}
             className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
