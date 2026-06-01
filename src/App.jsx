@@ -5,6 +5,7 @@ import Layout from './components/Layout';
 import Registro from './pages/Registro';
 import Diagnostico from './pages/Diagnostico';
 import Mercado from './pages/Mercado';
+import Admin from './pages/Admin';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -21,16 +22,24 @@ function AppRoutes() {
     </div>
   );
 
-  if (!user) return <Registro />;
-
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Diagnostico onPlagaDetectada={setPlagaDetectada} />} />
-        <Route path="/mercado" element={<Mercado plagaBuscada={plagaDetectada} />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Layout>
+    <Routes>
+      {/* Admin — ruta independiente, no usa Layout ni requiere sesión Firebase */}
+      <Route path="/admin" element={<Admin />} />
+
+      {/* App principal */}
+      <Route path="*" element={
+        !user ? <Registro /> : (
+          <Layout>
+            <Routes>
+              <Route path="/" element={<Diagnostico onPlagaDetectada={setPlagaDetectada} />} />
+              <Route path="/mercado" element={<Mercado plagaBuscada={plagaDetectada} />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </Layout>
+        )
+      } />
+    </Routes>
   );
 }
 

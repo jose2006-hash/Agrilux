@@ -1,0 +1,42 @@
+# ── Variables existentes ────────────────────────────────────────────
+OPENROUTER_API_KEY=
+VITE_GEMINI_API_KEY=
+GEMINI_API_KEY=
+VITE_DEEPSEEK_API_KEY=
+DEEPSEEK_API_KEY=
+CROP_HEALTH_API_KEY=
+PLANT_ID_API_KEY=
+HUGGINGFACE_API_KEY=
+AGROMONITORING_API_KEY=
+OPENWEATHER_API_KEY=
+SENTINEL_CLIENT_ID=
+SENTINEL_CLIENT_SECRET=
+NASA_EARTHDATA_KEY=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_WHATSAPP_FROM=
+VITE_MAPBOX_TOKEN=
+VITE_CULQI_PUBLIC_KEY=
+CULQI_SECRET_KEY=
+VITE_FIREBASE_API_KEY=
+VITE_FIREBASE_AUTH_DOMAIN=
+VITE_FIREBASE_PROJECT_ID=
+VITE_FIREBASE_STORAGE_BUCKET=
+VITE_FIREBASE_MESSAGING_SENDER_ID=
+VITE_FIREBASE_APP_ID=
+
+# ── Nuevas variables de Admin y Piloto ─────────────────────────────
+
+# Clave para entrar al panel /admin — solo tú la sabes
+# Ponla en Vercel → Environment Variables
+# Ej: VITE_ADMIN_KEY=lumajira2024admin
+VITE_ADMIN_KEY=
+
+# Contraseña por defecto para agricultores creados desde el admin
+# Cuando creas un usuario manualmente y no le asignas contraseña
+# usa esta. El agricultor puede cambiarla después.
+# Ej: VITE_PILOT_DEFAULT_PASS=agrilux2024
+VITE_PILOT_DEFAULT_PASS=agrilux2024
+
+# Google Drive (para exportar dataset)
+VITE_GOOGLE_CLIENT_ID=
