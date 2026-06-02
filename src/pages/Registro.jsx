@@ -1,23 +1,24 @@
 /**
  * src/pages/Registro.jsx
  *
- * Registro: nombre completo + correo + número DNI
- * Login:    correo + número DNI
+ * Registro: nombre completo + correo + celular
+ * Login:    solo número de celular
  */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
-import { Loader2, Eye, EyeOff, User, Mail, CreditCard } from 'lucide-react';
+import { Loader2, Eye, EyeOff, User, Mail, Phone } from 'lucide-react';
 
 const ERRORES = {
-  'auth/email-already-in-use': 'Este correo ya está registrado. Inicia sesión.',
-  'auth/invalid-email':        'El correo no es válido.',
-  'auth/weak-password':        'DNI inválido.',
-  'auth/user-not-found':       'No existe cuenta con ese correo.',
-  'auth/wrong-password':       'DNI incorrecto.',
-  'auth/invalid-credential':   'Correo o DNI incorrectos.',
-  'auth/too-many-requests':    'Demasiados intentos. Espera unos minutos.',
+  'agrilux/celular-en-uso':        'Este número ya tiene una cuenta. Inicia sesión.',
+  'agrilux/celular-no-encontrado': 'No encontramos ese número. ¿Ya tienes cuenta?',
+  'agrilux/sin-email':             'Error en la cuenta. Contacta soporte.',
+  'auth/email-already-in-use':     'Este correo ya está registrado.',
+  'auth/invalid-email':            'El correo no es válido.',
+  'auth/weak-password':            'Número de celular inválido.',
+  'auth/invalid-credential':       'Número de celular incorrecto.',
+  'auth/too-many-requests':        'Demasiados intentos. Espera unos minutos.',
 };
 
 function msgError(code) {
@@ -31,38 +32,38 @@ export default function Registro() {
   const [modo, setModo]       = useState('login');
   const [nombre, setNombre]   = useState('');
   const [email, setEmail]     = useState('');
-  const [dni, setDni]         = useState('');
-  const [verDni, setVerDni]   = useState(false);
+  const [celular, setCelular] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
 
   const cambiarModo = (m) => {
     setModo(m); setError('');
-    setNombre(''); setEmail(''); setDni('');
+    setNombre(''); setEmail(''); setCelular('');
   };
 
-  // Solo permite dígitos en el campo DNI, máximo 8
-  const handleDni = (val) => {
-    const solo = val.replace(/\D/g, '').slice(0, 8);
-    setDni(solo);
+  // Solo dígitos, máximo 9
+  const handleCelular = (val) => {
+    const solo = val.replace(/\D/g, '').slice(0, 9);
+    setCelular(solo);
   };
 
   const handleSubmit = async () => {
     setError('');
 
-    if (modo === 'registro' && !nombre.trim()) {
-      setError('Ingresa tu nombre completo.'); return;
+    if (modo === 'registro') {
+      if (!nombre.trim())       { setError('Ingresa tu nombre completo.'); return; }
+      if (!email.trim())        { setError('Ingresa tu correo electrónico.'); return; }
+      if (celular.length !== 9) { setError('El número de celular debe tener 9 dígitos.'); return; }
+    } else {
+      if (celular.length !== 9) { setError('Ingresa tu número de celular (9 dígitos).'); return; }
     }
-    if (!email.trim()) { setError('Ingresa tu correo electrónico.'); return; }
-    if (!dni)          { setError('Ingresa tu número de DNI.'); return; }
-    if (dni.length !== 8) { setError('El DNI debe tener exactamente 8 dígitos.'); return; }
 
     setLoading(true);
     try {
       if (modo === 'registro') {
-        await register({ nombre: nombre.trim(), email, dni });
+        await register({ nombre: nombre.trim(), email, celular });
       } else {
-        await login({ email, dni });
+        await login({ celular });
       }
     } catch (e) {
       setError(msgError(e.code));
@@ -109,93 +110,101 @@ export default function Registro() {
             </div>
           )}
 
-          {/* Nombre completo — solo en registro */}
+          {/* ── REGISTRO ── */}
           {modo === 'registro' && (
-            <div>
-              <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-                Nombre completo
-              </label>
-              <div className="relative">
-                <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-                <input
-                  value={nombre}
-                  onChange={e => setNombre(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                  placeholder="Ej: Juan Pérez García"
-                  className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
-                  autoComplete="name"
-                />
+            <>
+              {/* Nombre */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1.5">
+                  Nombre completo
+                </label>
+                <div className="relative">
+                  <User size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                    placeholder="Ej: Juan Pérez García"
+                    className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
+                    autoComplete="name"
+                  />
+                </div>
               </div>
-            </div>
+
+              {/* Correo */}
+              <div>
+                <label className="text-xs font-semibold text-gray-600 block mb-1.5">
+                  Correo electrónico
+                </label>
+                <div className="relative">
+                  <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSubmit()}
+                    placeholder="tucorreo@gmail.com"
+                    className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
+                    autoComplete="email"
+                    inputMode="email"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Correo */}
+          {/* ── CELULAR (login y registro) ── */}
           <div>
             <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-              Correo electrónico
+              {modo === 'login' ? 'Número de celular' : 'Número de celular (tu clave de acceso)'}
             </label>
             <div className="relative">
-              <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                <span className="text-xs text-gray-400 font-semibold">🇵🇪 +51</span>
+              </div>
               <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                type="tel"
+                value={celular}
+                onChange={e => handleCelular(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                placeholder="tucorreo@gmail.com"
-                className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors"
-                autoComplete="email"
-                inputMode="email"
-              />
-            </div>
-          </div>
-
-          {/* DNI */}
-          <div>
-            <label className="text-xs font-semibold text-gray-600 block mb-1.5">
-              Número de DNI
-            </label>
-            <div className="relative">
-              <CreditCard size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" />
-              <input
-                type={verDni ? 'text' : 'password'}
-                value={dni}
-                onChange={e => handleDni(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSubmit()}
-                placeholder="8 dígitos"
-                maxLength={8}
+                placeholder="9XX XXX XXX"
+                maxLength={9}
                 inputMode="numeric"
                 pattern="[0-9]*"
-                className="w-full border-2 border-gray-100 rounded-2xl pl-10 pr-12 py-3 text-sm focus:outline-none focus:border-primary transition-colors tracking-widest"
-                autoComplete="off"
+                className="w-full border-2 border-gray-100 rounded-2xl pl-16 pr-4 py-3 text-sm focus:outline-none focus:border-primary transition-colors tracking-widest font-mono"
+                autoComplete="tel"
               />
-              <button
-                type="button"
-                onClick={() => setVerDni(v => !v)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-              >
-                {verDni ? <EyeOff size={18} /> : <Eye size={18} />}
-              </button>
             </div>
-            {/* Indicador de dígitos ingresados */}
+
+            {/* Indicador de progreso */}
             <div className="flex gap-1 mt-2 px-1">
-              {Array.from({ length: 8 }).map((_, i) => (
+              {Array.from({ length: 9 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`flex-1 h-1 rounded-full transition-all ${
-                    i < dni.length ? 'bg-primary' : 'bg-gray-100'
+                  className={`flex-1 h-1 rounded-full transition-all duration-150 ${
+                    i < celular.length ? 'bg-primary' : 'bg-gray-100'
                   }`}
                 />
               ))}
             </div>
-            {dni.length > 0 && dni.length < 8 && (
-              <p className="text-xs text-gray-400 mt-1 ml-1">{dni.length}/8 dígitos</p>
+
+            {celular.length > 0 && celular.length < 9 && (
+              <p className="text-xs text-gray-400 mt-1 ml-1">{celular.length}/9 dígitos</p>
             )}
-            {dni.length === 8 && (
-              <p className="text-xs text-green-500 mt-1 ml-1">✓ DNI completo</p>
+            {celular.length === 9 && (
+              <p className="text-xs text-green-500 mt-1 ml-1 flex items-center gap-1">
+                ✓ Número completo
+              </p>
+            )}
+
+            {modo === 'login' && (
+              <p className="text-xs text-gray-400 mt-2 ml-1">
+                Ingresa el número con el que te registraste
+              </p>
             )}
           </div>
 
-          {/* Botón principal */}
+          {/* Botón */}
           <button
             onClick={handleSubmit}
             disabled={loading}
@@ -211,7 +220,7 @@ export default function Registro() {
 
           {modo === 'registro' && (
             <p className="text-xs text-gray-400 text-center">
-              Tu DNI es tu clave de acceso. No lo compartas con nadie.
+              Tu número de celular es tu clave de acceso. Guárdalo bien.
             </p>
           )}
         </div>
@@ -229,7 +238,7 @@ export default function Registro() {
               935 211 605
             </a>
           </p>
-          {/* Acceso admin — discreto */}
+          {/* Acceso admin discreto */}
           <button
             onClick={() => navigate('/admin')}
             className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
