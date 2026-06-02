@@ -29,6 +29,13 @@ export const CULTIVOS = [
     categoria: 'frutal',
     variedades: ['Biloxi', 'Emerald', 'Jewel', 'O\'Neal'],
   },
+  {
+    id: 'cana',
+    nombre: 'Caña de azúcar',
+    emoji: '🎋',
+    categoria: 'industrial',
+    variedades: ['NA56', 'CC01-941', 'SP71-6949', 'CP52-43', 'H59-3774'],
+  },
 ];
 
 export const PRECIOS_BASE = {
@@ -36,4 +43,5 @@ export const PRECIOS_BASE = {
   maiz:     { min: 1.20, max: 2.80, unidad: 'kg' },
   palta:    { min: 2.00, max: 5.00, unidad: 'kg' },
   arandano: { min: 8.00, max: 18.00, unidad: 'kg' },
+  cana:     { min: 0.12, max: 0.22, unidad: 'kg' },
 };

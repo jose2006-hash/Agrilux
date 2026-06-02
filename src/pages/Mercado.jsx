@@ -120,7 +120,7 @@ function ModalProducto({ tiendaId, onClose, onSuccess }) {
 - Para qué sirve (descripción breve)
 - Qué plagas o enfermedades controla
 - Modo de uso básico
-- Para qué cultivos es compatible (de esta lista: Papa, Maíz, Palta, Arándano)
+- Para qué cultivos es compatible (de esta lista: Papa, Maíz, Palta, Arándano, Caña de azúcar)
 Responde en español simple para agricultores.`,
         file_urls: fotos.length ? await Promise.all(fotos.map(f => compress(f.dataUrl))) : [],
         response_json_schema: {
