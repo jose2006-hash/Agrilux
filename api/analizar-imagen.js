@@ -10,51 +10,78 @@ export default async function handler(req, res) {
   if (!prompt)
     return res.status(400).json({ error: 'Falta el campo prompt' });
 
-  try {
-    const userContent = [
-      { type: 'text', text: prompt },
-      ...(Array.isArray(images) ? images.map(img => ({
-        type: 'image_url',
-        image_url: { url: img },
-      })) : []),
-    ];
+  // Modelos con visión disponibles en OpenRouter (en orden de prioridad)
+  const MODELOS_VISION = [
+    'google/gemini-2.0-flash-exp:free',   // Gemini 2.0 Flash gratuito
+    'google/gemini-flash-1.5',            // Gemini 1.5 Flash
+    'meta-llama/llama-4-maverick',        // Llama 4 Maverick (visión)
+    'openai/gpt-4o-mini',                 // GPT-4o Mini (fallback)
+  ];
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-        'HTTP-Referer': 'https://vitalfarmbright.store',
-        'X-Title': 'Agrilux',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-001', // ✅ Cambiado: soporta visión + base64
-        messages: [
-          ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
-          {
-            role: 'user',
-            content: userContent,
-          },
-        ],
-        max_tokens: 1500,
-        temperature: 0.3,
-      }),
-    });
+  const tieneImagenes = Array.isArray(images) && images.length > 0;
 
-    const data = await response.json();
+  const userContent = tieneImagenes
+    ? [
+        { type: 'text', text: prompt },
+        ...images.map(img => ({
+          type: 'image_url',
+          image_url: { url: img },
+        })),
+      ]
+    : prompt;
 
-    // ✅ Log para ver errores reales en Vercel → Logs
-    if (!response.ok) {
-      console.error('OpenRouter error:', JSON.stringify(data));
-      return res.status(response.status).json({ error: data.error?.message || 'Error de OpenRouter' });
+  // Intentar con cada modelo hasta que uno responda
+  let ultimoError = null;
+
+  for (const modelo of MODELOS_VISION) {
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'https://vitalfarmbright.store',
+          'X-Title': 'Agrilux',
+        },
+        body: JSON.stringify({
+          model: modelo,
+          messages: [
+            ...(systemPrompt ? [{ role: 'system', content: systemPrompt }] : []),
+            { role: 'user', content: userContent },
+          ],
+          max_tokens: 1500,
+          temperature: 0.3,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.warn(`Modelo ${modelo} falló:`, data.error?.message);
+        ultimoError = data.error?.message;
+        continue; // intentar con el siguiente
+      }
+
+      const content = data.choices?.[0]?.message?.content;
+      if (!content) {
+        console.warn(`Modelo ${modelo}: sin contenido en respuesta`);
+        continue;
+      }
+
+      console.log(`✓ Respondió con modelo: ${modelo}`);
+      return res.status(200).json({ choices: [{ message: { content } }], modelo_usado: modelo });
+
+    } catch (err) {
+      console.warn(`Error con modelo ${modelo}:`, err.message);
+      ultimoError = err.message;
+      continue;
     }
-
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) return res.status(500).json({ error: 'Sin respuesta del modelo' });
-
-    return res.status(200).json({ choices: [{ message: { content } }] });
-  } catch (err) {
-    console.error('Error interno:', err.message);
-    return res.status(500).json({ error: err.message });
   }
+
+  // Si todos fallaron
+  console.error('Todos los modelos fallaron. Último error:', ultimoError);
+  return res.status(500).json({
+    error: 'No se pudo obtener respuesta de ningún modelo de IA.',
+    detalle: ultimoError,
+  });
 }
