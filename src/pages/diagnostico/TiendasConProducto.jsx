@@ -4,8 +4,9 @@ import { db } from '../../lib/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
 
-export default function TiendasConProducto({ productoBuscado, onCerrar }) {
+export default function TiendasConProducto({ productoBuscado, onCerrar, ubicacionUsuario = '' }) {
   const [tiendas, setTiendas] = useState([]);
+  const [tiendasLocales, setTiendasLocales] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -38,8 +39,21 @@ export default function TiendasConProducto({ productoBuscado, onCerrar }) {
         .sort((a, b) => (parseFloat(a.precio) || 9999) - (parseFloat(b.precio) || 9999));
 
       setTiendas(resultado);
+
+      const u = (ubicacionUsuario || '').trim().toLowerCase();
+      if (u) {
+        const tokens = u.split(/[,\\s]+/).filter(t => t.length > 2);
+        const locales = resultado.filter(prod => {
+          const tUb = (prod.tiendaInfo?.ubicacion || '').toLowerCase();
+          return tokens.some(tok => tUb.includes(tok));
+        });
+        setTiendasLocales(locales);
+      } else {
+        setTiendasLocales([]);
+      }
     } catch (e) {
       setTiendas([]);
+      setTiendasLocales([]);
     }
     setLoading(false);
   };
@@ -77,6 +91,23 @@ export default function TiendasConProducto({ productoBuscado, onCerrar }) {
             </div>
           ) : (
             <>
+              {!!ubicacionUsuario?.trim() && (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3">
+                  <p className="text-xs font-bold text-blue-700">
+                    📍 Buscando tiendas cerca de: {ubicacionUsuario}
+                  </p>
+                  {tiendasLocales.length === 0 ? (
+                    <p className="text-xs text-blue-700/80 mt-1">
+                      No encontramos tiendas locales con este producto. Te muestro igual las tiendas disponibles.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-blue-700/80 mt-1">
+                      Encontramos {tiendasLocales.length} opción(es) cerca. Te las muestro primero.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div className="bg-green-50 border border-green-200 rounded-2xl p-3 flex items-center gap-2">
                 <Star size={16} className="text-green-600 fill-green-600" />
                 <p className="text-xs font-bold text-green-700">
@@ -84,7 +115,7 @@ export default function TiendasConProducto({ productoBuscado, onCerrar }) {
                 </p>
               </div>
 
-              {tiendas.map((prod, idx) => (
+              {(tiendasLocales.length > 0 ? tiendasLocales : tiendas).map((prod, idx) => (
                 <div key={prod.id}
                   className={`bg-white rounded-2xl p-4 shadow-sm border ${idx === 0 ? 'border-primary' : 'border-gray-100'}`}>
                   {idx === 0 && (

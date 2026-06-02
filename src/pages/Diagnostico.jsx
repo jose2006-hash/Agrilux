@@ -68,6 +68,10 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const chatEndRef = useRef(null);
   const reconRef   = useRef(null);
   const reconPregRef = useRef(null);
+  const ubicacionInputRef = useRef(null);
+  const [pedirUbicacion, setPedirUbicacion] = useState(false);
+
+  const ubicacionEfectiva = (ubicacion || user?.ubicacion || '').trim();
 
   // ── Geolocalización silenciosa al montar ─────────────────────────────────────
   // Intenta obtener ubicación del navegador en background, sin mostrar nada al usuario
@@ -95,6 +99,11 @@ export default function Diagnostico({ onPlagaDetectada }) {
       { timeout: 8000 }
     );
   }, []);
+
+  // Prefill de ubicación visible (si el usuario la tiene en perfil)
+  useEffect(() => {
+    if (!ubicacion && user?.ubicacion) setUbicacion(user.ubicacion);
+  }, [user?.ubicacion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFoto = (e) => {
     Array.from(e.target.files).forEach(file => {
@@ -144,18 +153,25 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const analizarUnaVez = async (compressedUrls, consultaTexto = '') => {
     const climaCtx = buildClimaContext();
     const esConsultaTexto = !compressedUrls.length && consultaTexto;
+    const lugar = ubicacionEfectiva;
+    const lugarCtx = lugar ? `Ubicación declarada por el agricultor: ${lugar}.` : '';
 
     const promptBase = esConsultaTexto
       ? `El agricultor consulta sin foto sobre su ${cultivo.nombre}: "${consultaTexto}"
+${lugarCtx}
 ${climaCtx ? `Contexto ambiental: ${climaCtx}` : ''}
 Usa el contexto climático y de suelo para dar una recomendación precisa.
 Responde SOLO con este JSON (sin markdown):
 {"tiene_problema":true,"nombre_problema":"Consulta directa","nombre_cientifico":"","gravedad":"leve","que_tiene":"${consultaTexto}","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`
       : `Analiza la foto de ${cultivo.nombre} y evalúa su estado fitosanitario.
+${lugarCtx}
 ${climaCtx ? `Contexto ambiental actual de la parcela: ${climaCtx}. Usa estos datos para ajustar tus recomendaciones (ej: si hay lluvia, prioriza fungicidas sistémicos; si el pH es ácido, ajusta dosis).` : ''}
 Identifica alteraciones visuales (color, manchas, deformaciones, lesiones).
-En aplicacion_inmediata y productos: nombres comerciales reales en Perú (Antracol, Mancozeb, Score, Ridomil, Karate) con dosis, frecuencia y carencia.
-Sugiere 2-3 productos alternativos. Español claro para agricultores. Si está sana: tiene_problema false.
+FORMATO OBLIGATORIO (didáctico y preciso, tono animado):
+1) En que_tiene: Detección (qué es y signos) + Causas probables + Prevención (en frases cortas).
+2) En que_hacer: Recomendaciones de soluciones y métodos (culturales + químicas si aplica).
+3) En aplicacion_inmediata + productos: Productos recomendados y modo de uso (dosis, frecuencia, carencia).
+Usa español simple para agricultores. Si está sana: tiene_problema false.
 Responde SOLO con este JSON (sin markdown):
 {"tiene_problema":bool,"nombre_problema":"","nombre_cientifico":"","gravedad":"ninguna|leve|moderada|grave|critica","que_tiene":"","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[{"nombre":"","ingrediente_activo":"","dosis":"","frecuencia":"","carencia":""}],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`;
 
@@ -390,7 +406,11 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
         <AgenteCompra resultado={resultado} cultivo={cultivo} user={user} onCerrar={() => setMostrarAgente(false)} />
       )}
       {productoBuscando && (
-        <TiendasConProducto productoBuscado={productoBuscando} onCerrar={() => setProductoBuscando(null)} />
+        <TiendasConProducto
+          productoBuscado={productoBuscando}
+          ubicacionUsuario={ubicacionEfectiva}
+          onCerrar={() => setProductoBuscando(null)}
+        />
       )}
 
       {/* Header */}
@@ -549,42 +569,59 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
 
       <div className="px-4 space-y-4">
 
-        {/* Diagnóstico */}
+        {/* 1) Detección + causas + prevención (didáctico) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">🔍 Diagnóstico</p>
-          <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_tiene}</p>
-          {resultado.causa && (
-            <div className="mt-2 pt-2 border-t border-gray-100">
-              <p className="text-xs font-bold text-gray-400 mb-1">Causa probable</p>
-              <p className="text-gray-600 text-xs">{resultado.causa}</p>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">1) 🕵️ Detección, causas y prevención</p>
+          {resultado.que_tiene && (
+            <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_tiene}</p>
+          )}
+          {(resultado.causa || resultado.prevencion) && (
+            <div className="mt-3 grid gap-2">
+              {resultado.causa && (
+                <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                  <p className="text-xs font-bold text-amber-700 mb-1">Causas probables</p>
+                  <p className="text-amber-800 text-xs leading-relaxed">{resultado.causa}</p>
+                </div>
+              )}
+              {resultado.prevencion && (
+                <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                  <p className="text-xs font-bold text-green-700 mb-1">Prevención</p>
+                  <p className="text-green-800 text-xs leading-relaxed">{resultado.prevencion}</p>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {resultado.aplicacion_inmediata && resultado.tiene_problema && (
-          <div className="bg-red-50 border-l-4 border-red-500 rounded-2xl p-4">
-            <p className="text-xs font-bold text-red-600 uppercase tracking-wide mb-2">⚡ Acción Inmediata</p>
-            <p className="text-red-700 text-sm leading-relaxed font-medium">{resultado.aplicacion_inmediata}</p>
-          </div>
-        )}
-
-        {resultado.que_hacer && resultado.tiene_problema && (
+        {/* 2) Soluciones y métodos */}
+        {resultado.tiene_problema && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">📋 Plan de Control</p>
-            <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_hacer}</p>
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">2) 🛠️ Soluciones y métodos</p>
+            {resultado.que_hacer ? (
+              <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_hacer}</p>
+            ) : (
+              <p className="text-gray-500 text-sm">Sin plan adicional.</p>
+            )}
             {resultado.cuando_aplicar && (
               <div className="mt-3 bg-blue-50 rounded-xl p-3">
                 <p className="text-xs font-bold text-blue-600 mb-1">🕐 Cuándo aplicar</p>
                 <p className="text-blue-700 text-xs">{resultado.cuando_aplicar}</p>
               </div>
             )}
+            {resultado.aplicacion_inmediata && (
+              <div className="mt-3 bg-red-50 border border-red-100 rounded-xl p-3">
+                <p className="text-xs font-bold text-red-600 mb-1">⚡ Acción inmediata</p>
+                <p className="text-red-700 text-sm leading-relaxed font-medium">{resultado.aplicacion_inmediata}</p>
+              </div>
+            )}
           </div>
         )}
 
+        {/* 3) Productos y modo de uso */}
         {resultado.productos?.length > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">💊 Productos Recomendados</p>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">3) 💊 Productos recomendados y modo de uso</p>
               <span className="text-xs text-gray-400">{resultado.productos.length} opciones</span>
             </div>
             <div className="space-y-3">
@@ -596,7 +633,14 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
                       {p.ingrediente_activo && <p className="text-xs text-gray-400 italic truncate">{p.ingrediente_activo}</p>}
                     </div>
                     <button
-                      onClick={() => setProductoBuscando(p.nombre)}
+                      onClick={() => {
+                        if (!ubicacionEfectiva) {
+                          setPedirUbicacion(true);
+                          setTimeout(() => ubicacionInputRef.current?.focus(), 50);
+                          return;
+                        }
+                        setProductoBuscando(p.nombre);
+                      }}
                       className="ml-2 flex-shrink-0 flex items-center gap-1 bg-primary text-white text-xs font-bold px-3 py-1.5 rounded-lg">
                       <ShoppingBag size={12} /> Ver precio
                     </button>
@@ -834,10 +878,43 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
 
       <div className="px-4 py-4 space-y-4">
 
+        {/* Ubicación (grande) */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <p className="text-lg font-display font-extrabold text-gray-900 text-center">
+            📍 Escribe tu ubicación (Provincia, Departamento)
+          </p>
+          <p className="text-xs text-gray-500 text-center mt-1">
+            Sirve para recomendaciones más precisas y para ver si hay tiendas cercanas.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              ref={ubicacionInputRef}
+              value={ubicacion}
+              onChange={(e) => { setUbicacion(e.target.value); if (pedirUbicacion) setPedirUbicacion(false); }}
+              placeholder="Ej: Cutervo, Cajamarca"
+              className={`flex-1 border rounded-xl px-3 py-2.5 text-sm focus:outline-none ${
+                pedirUbicacion ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-primary'
+              }`}
+            />
+            <button
+              onClick={() => setUbicacion(user?.ubicacion || ubicacion)}
+              className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold"
+              type="button"
+            >
+              Guardar
+            </button>
+          </div>
+          {pedirUbicacion && (
+            <p className="text-red-600 text-xs font-bold text-center mt-2">
+              Necesito tu ubicación para buscar tiendas locales cerca de tu parcela.
+            </p>
+          )}
+        </div>
+
         {/* Selector de cultivo */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">¿Qué cultivo es?</p>
-          <div className="flex gap-3 justify-center">
+          <div className="flex flex-wrap gap-3 justify-center">
             {CULTIVOS.map(c => (
               <button key={c.id} onClick={() => setCultivo(c)}
                 className={`flex flex-col items-center gap-1.5 px-5 py-3 rounded-2xl transition-all ${
