@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import Layout from './components/Layout';
+import SelectorUbicacion from './components/SelectorUbicacion';
 import Registro from './pages/Registro';
 import Diagnostico from './pages/Diagnostico';
 import Mercado from './pages/Mercado';
@@ -21,6 +22,13 @@ function AppRoutes() {
       </div>
     </div>
   );
+
+  // Primera vez: mostrar selector de ubicación si no tiene ubicación guardada
+  if (user && !user.ubicacion) {
+    return (
+      <SelectorUbicacion esPrimeraVez={true} />
+    );
+  }
 
   return (
     <Routes>

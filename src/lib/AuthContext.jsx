@@ -96,13 +96,19 @@ export const AuthProvider = ({ children }) => {
     return cred.user;
   };
 
+  const updateUbicacion = async (ubicacion) => {
+    if (!user?.uid) throw new Error('No hay sesión');
+    await setDoc(doc(db, 'usuarios', user.uid), { ubicacion }, { merge: true });
+    setUser(prev => ({ ...prev, ubicacion }));
+  };
+
   const logout = async () => {
     await signOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, register, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, register, login, logout, updateUbicacion }}>
       {children}
     </AuthContext.Provider>
   );

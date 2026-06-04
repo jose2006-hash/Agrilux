@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera, Loader2, AlertTriangle, CheckCircle, Send,
   Mic, MicOff, Volume2, VolumeX, ShoppingBag,
-  ChevronRight, Bot, Sparkles, ImagePlus, X,
+  ChevronRight, Bot, Sparkles, ImagePlus, X, MapPin,
 } from 'lucide-react';
 import { useAuth }       from '../lib/AuthContext';
 import { invokeGemini }  from '../lib/gemini';
@@ -23,6 +23,7 @@ import { useNavigate }   from 'react-router-dom';
 import { SISTEMA_PROMPT, CHAT_SYSTEM, ANALISIS_SCHEMA } from './diagnostico/diagnosticoPrompts';
 import TiendasConProducto from './diagnostico/TiendasConProducto';
 import AgenteCompra       from './diagnostico/AgenteCompra';
+import SelectorUbicacion  from '../components/SelectorUbicacion';
 
 const COLOR_HEADER = {
   critica:  'bg-red-700',
@@ -70,6 +71,7 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const reconPregRef = useRef(null);
   const ubicacionInputRef = useRef(null);
   const [pedirUbicacion, setPedirUbicacion] = useState(false);
+  const [mostrarSelectorUbicacion, setMostrarSelectorUbicacion] = useState(false);
 
   const ubicacionEfectiva = (ubicacion || user?.ubicacion || '').trim();
 
@@ -878,37 +880,24 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
 
       <div className="px-4 py-4 space-y-4">
 
-        {/* Ubicación (grande) */}
+        {/* Ubicación — botón para cambiar */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-          <p className="text-lg font-display font-extrabold text-gray-900 text-center">
-            📍 Escribe tu ubicación (Provincia, Departamento)
-          </p>
-          <p className="text-xs text-gray-500 text-center mt-1">
-            Sirve para recomendaciones más precisas y para ver si hay tiendas cercanas.
-          </p>
-          <div className="mt-3 flex gap-2">
-            <input
-              ref={ubicacionInputRef}
-              value={ubicacion}
-              onChange={(e) => { setUbicacion(e.target.value); if (pedirUbicacion) setPedirUbicacion(false); }}
-              placeholder="Ej: Cutervo, Cajamarca"
-              className={`flex-1 border rounded-xl px-3 py-2.5 text-sm focus:outline-none ${
-                pedirUbicacion ? 'border-red-400 focus:border-red-500' : 'border-gray-200 focus:border-primary'
-              }`}
-            />
-            <button
-              onClick={() => setUbicacion(user?.ubicacion || ubicacion)}
-              className="px-4 py-2.5 rounded-xl bg-gray-100 text-gray-700 text-sm font-bold"
-              type="button"
-            >
-              Guardar
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">📍 Ubicación</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm text-gray-700 font-medium truncate">
+                {user?.ubicacion || 'Sin ubicación'}
+              </span>
+            </div>
+            <button onClick={() => setMostrarSelectorUbicacion(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary-dark transition-all shadow-md active:scale-95">
+              <MapPin size={16} />
+              Cambiar ubicación
             </button>
           </div>
-          {pedirUbicacion && (
-            <p className="text-red-600 text-xs font-bold text-center mt-2">
-              Necesito tu ubicación para buscar tiendas locales cerca de tu parcela.
-            </p>
-          )}
+          <p className="text-xs text-gray-400 mt-2">
+            GPS · Voz · Texto — para recomendaciones más precisas
+          </p>
         </div>
 
         {/* Selector de cultivo */}
@@ -974,6 +963,14 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
           </div>
         </div>
       </div>
+
+      {mostrarSelectorUbicacion && (
+        <div className="fixed inset-0 z-50 bg-white/95 flex items-center justify-center" style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-[430px] mx-auto relative">
+            <SelectorUbicacion esPrimeraVez={false} onClose={() => setMostrarSelectorUbicacion(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
