@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Camera, Loader2, AlertTriangle, CheckCircle, Send,
   Mic, MicOff, Volume2, VolumeX, ShoppingBag,
-  ChevronRight, Bot, Sparkles, ImagePlus, X,
+  ChevronRight, Bot, Sparkles, ImagePlus, X, Cloud, CloudOff, Wifi,
 } from 'lucide-react';
 import { useAuth }       from '../lib/AuthContext';
 import { invokeGemini }  from '../lib/gemini';
@@ -23,6 +23,14 @@ import { useNavigate }   from 'react-router-dom';
 import { SISTEMA_PROMPT, CHAT_SYSTEM, ANALISIS_SCHEMA } from './diagnostico/diagnosticoPrompts';
 import TiendasConProducto from './diagnostico/TiendasConProducto';
 import AgenteCompra       from './diagnostico/AgenteCompra';
+import ImageCapture from '../components/ImageCapture';
+import { useOnlineStatus } from '../lib/useOnlineStatus';
+import { 
+  saveOfflineImage, 
+  getPendingImages, 
+  markImageAsSynced, 
+  getOfflineImageStats 
+} from '../lib/offlineImageStorage';
 
 const COLOR_HEADER = {
   critica:  'bg-red-700',
@@ -71,6 +79,16 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const ubicacionInputRef = useRef(null);
   const [pedirUbicacion, setPedirUbicacion] = useState(false);
 
+  // Offline-first image system
+  const [showImageCapture, setShowImageCapture] = useState(false);
+  const [offlineStats, setOfflineStats] = useState({ total: 0, pending: 0 });
+  const isOnline = useOnlineStatus((status) => {
+    if (status && offlineStats.pending > 0) {
+      // Cuando se recupera conexión, sincronizar pendientes
+      syncPendingImages();
+    }
+  });
+
   const ubicacionEfectiva = (ubicacion || user?.ubicacion || '').trim();
 
   // ── Geolocalización silenciosa al montar ─────────────────────────────────────
@@ -105,6 +123,32 @@ export default function Diagnostico({ onPlagaDetectada }) {
     if (!ubicacion && user?.ubicacion) setUbicacion(user.ubicacion);
   }, [user?.ubicacion]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Cargar estado del almacenamiento offline al montar
+  useEffect(() => {
+    const loadOfflineStats = async () => {
+      const stats = await getOfflineImageStats();
+      setOfflineStats(stats);
+    };
+    loadOfflineStats();
+  }, []);
+
+  const syncPendingImages = async () => {
+    const stats = await getOfflineImageStats();
+    if (stats.pending === 0) return;
+
+    try {
+      for (const image of stats.pendingImages) {
+        if (isOnline) {
+          await markImageAsSynced(image.id);
+        }
+      }
+      const updatedStats = await getOfflineImageStats();
+      setOfflineStats(updatedStats);
+    } catch (error) {
+      console.error('Error syncing pending images:', error);
+    }
+  };
+
   const handleFoto = (e) => {
     Array.from(e.target.files).forEach(file => {
       const reader = new FileReader();
@@ -116,6 +160,33 @@ export default function Diagnostico({ onPlagaDetectada }) {
         });
       reader.readAsDataURL(file);
     });
+  };
+
+  const handleImageCapture = async (imageData) => {
+    setShowImageCapture(false);
+    
+    // Agregar a fotos locales
+    setFotos(prev => {
+      const next = [...prev, { preview: imageData.preview, dataUrl: imageData.dataUrl }];
+      try { setCurrentIndex(next.length - 1); } catch {}
+      return next;
+    });
+
+    // Si no hay conexión, guardar en offline storage
+    if (!isOnline) {
+      try {
+        await saveOfflineImage({
+          userId: user?.uid,
+          userName: user?.nombre,
+          dataUrl: imageData.dataUrl,
+          source: imageData.source,
+        });
+        const stats = await getOfflineImageStats();
+        setOfflineStats(stats);
+      } catch (error) {
+        console.error('Error saving offline image:', error);
+      }
+    }
   };
 
   const compressDataUrl = (dataUrl) => new Promise(resolve => {
@@ -784,6 +855,21 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
           </div>
           <h1 className="text-3xl font-display font-bold">Diagnóstico IA</h1>
           <p className="text-white/80 text-sm mt-2">Detecta plagas, enfermedades y malezas</p>
+          
+          {/* Estado de conexión */}
+          <div className="flex items-center justify-center gap-1.5 mt-3 text-xs">
+            {isOnline ? (
+              <>
+                <Wifi size={14} className="text-green-300" />
+                <span className="text-green-200">Conectado</span>
+              </>
+            ) : (
+              <>
+                <CloudOff size={14} className="text-orange-300" />
+                <span className="text-orange-200">Sin conexión</span>
+              </>
+            )}
+          </div>
         </div>
 
         {/* ── ZONA UNIFICADA: foto + texto + audio ── */}
@@ -791,7 +877,7 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
 
           {/* Área de foto — opcional */}
           <div
-            onClick={() => fileRef.current?.click()}
+            onClick={() => setShowImageCapture(true)}
             className="border-b border-white/10 p-5 text-center cursor-pointer hover:bg-white/10 transition-all active:scale-[0.98]">
             {fotos.length === 0 ? (
               <div className="flex items-center justify-center gap-3">
@@ -844,7 +930,26 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
               </div>
             )}
           </div>
+          
+          {/* ImageCapture Modal */}
+          {showImageCapture && (
+            <ImageCapture 
+              onCapture={handleImageCapture} 
+              onClose={() => setShowImageCapture(false)}
+              isOnline={isOnline}
+            />
+          )}
+
+          {/* Fallback input file */}
           <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFoto} className="hidden" />
+
+          {/* Indicador de estado offline */}
+          {!isOnline && offlineStats.pending > 0 && (
+            <div className="bg-amber-900/20 border-t border-white/10 px-4 py-2 flex items-center gap-2 justify-center text-amber-100 text-xs">
+              <CloudOff size={14} />
+              <span>{offlineStats.pending} foto(s) pendiente(s) de subir</span>
+            </div>
+          )}
 
           {/* Área de texto + audio */}
           <div className="p-4">
