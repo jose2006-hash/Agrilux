@@ -163,8 +163,9 @@ export default function Diagnostico({ onPlagaDetectada }) {
 ${lugarCtx}
 ${climaCtx ? `Contexto ambiental: ${climaCtx}` : ''}
 Usa el contexto climático y de suelo para dar una recomendación precisa.
+Incluye siempre el grado_afectacion (texto: ej "Afecta hojas bajas y tallos") y porcentaje_severidad (0-100, ej 35).
 Responde SOLO con este JSON (sin markdown):
-{"tiene_problema":true,"nombre_problema":"Consulta directa","nombre_cientifico":"","gravedad":"leve","que_tiene":"${consultaTexto}","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`
+{"tiene_problema":true,"nombre_problema":"Consulta directa","nombre_cientifico":"","gravedad":"leve","grado_afectacion":"","porcentaje_severidad":0,"que_tiene":"${consultaTexto}","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`
       : `Analiza la foto de ${cultivo.nombre} y evalúa su estado fitosanitario.
 ${lugarCtx}
 ${climaCtx ? `Contexto ambiental actual de la parcela: ${climaCtx}. Usa estos datos para ajustar tus recomendaciones (ej: si hay lluvia, prioriza fungicidas sistémicos; si el pH es ácido, ajusta dosis).` : ''}
@@ -173,9 +174,11 @@ FORMATO OBLIGATORIO (didáctico y preciso, tono animado):
 1) En que_tiene: Detección (qué es y signos) + Causas probables + Prevención (en frases cortas).
 2) En que_hacer: Recomendaciones de soluciones y métodos (culturales + químicas si aplica).
 3) En aplicacion_inmediata + productos: Productos recomendados y modo de uso (dosis, frecuencia, carencia).
+4) grado_afectacion: descripción de qué partes de la planta están afectadas (ej "Hojas inferiores y tallos jóvenes").
+5) porcentaje_severidad: número entre 0-100 estimado del daño en el cultivo.
 Usa español simple para agricultores. Si está sana: tiene_problema false.
 Responde SOLO con este JSON (sin markdown):
-{"tiene_problema":bool,"nombre_problema":"","nombre_cientifico":"","gravedad":"ninguna|leve|moderada|grave|critica","que_tiene":"","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[{"nombre":"","ingrediente_activo":"","dosis":"","frecuencia":"","carencia":""}],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`;
+{"tiene_problema":bool,"nombre_problema":"","nombre_cientifico":"","gravedad":"ninguna|leve|moderada|grave|critica","grado_afectacion":"","porcentaje_severidad":0,"que_tiene":"","causa":"","aplicacion_inmediata":"","que_hacer":"","productos":[{"nombre":"","ingrediente_activo":"","dosis":"","frecuencia":"","carencia":""}],"cuando_aplicar":"","prevencion":"","alerta_clima":""}`;
 
     return invokeGemini({
       systemPrompt: SISTEMA_PROMPT[cultivo.id],
@@ -416,20 +419,40 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
       )}
 
       {/* Header */}
-      <div className={`px-6 pt-12 pb-6 text-white ${COLOR_HEADER[resultado.gravedad] || 'bg-primary'}`}>
-        <button onClick={resetear} className="text-white/70 text-sm mb-3">← Nuevo diagnóstico</button>
-        <div className="flex items-center gap-3">
-          {resultado.tiene_problema ? <AlertTriangle size={28} /> : <CheckCircle size={28} />}
-          <div>
-            <h1 className="text-xl font-display font-bold">
-              {resultado.tiene_problema ? resultado.nombre_problema : '✓ Cultivo Saludable'}
-            </h1>
-            {resultado.nombre_cientifico && (
-              <p className="text-white/70 text-xs italic">{resultado.nombre_cientifico}</p>
-            )}
-            <p className="text-white/80 text-sm mt-0.5">{cultivo.emoji} {cultivo.nombre}</p>
+        <div className={`px-6 pt-12 pb-6 text-white ${COLOR_HEADER[resultado.gravedad] || 'bg-primary'}`}>
+          <button onClick={resetear} className="text-white/70 text-sm mb-3">← Nuevo diagnóstico</button>
+          <div className="flex items-center gap-3">
+            {resultado.tiene_problema ? <AlertTriangle size={28} /> : <CheckCircle size={28} />}
+            <div>
+              <h1 className="text-xl font-display font-bold">
+                {resultado.tiene_problema ? resultado.nombre_problema : '✓ Cultivo Saludable'}
+              </h1>
+              {resultado.nombre_cientifico && (
+                <p className="text-white/70 text-xs italic">{resultado.nombre_cientifico}</p>
+              )}
+              <p className="text-white/80 text-sm mt-0.5">{cultivo.emoji} {cultivo.nombre}</p>
+            </div>
           </div>
-        </div>
+          {resultado.tiene_problema && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="text-xs bg-white/20 rounded-full px-3 py-1 font-semibold">
+                {resultado.gravedad === 'critica' ? '🔴 Crítico' :
+                 resultado.gravedad === 'grave' ? '🟠 Grave' :
+                 resultado.gravedad === 'moderada' ? '🟡 Moderado' :
+                 resultado.gravedad === 'leve' ? '🟢 Leve' : '⚪ Sin gravedad'}
+              </span>
+              {resultado.porcentaje_severidad > 0 && (
+                <span className="text-xs bg-white/20 rounded-full px-3 py-1 font-semibold">
+                  Severidad: {resultado.porcentaje_severidad}%
+                </span>
+              )}
+              {resultado.grado_afectacion && (
+                <span className="text-xs bg-white/15 rounded-full px-3 py-1">
+                  {resultado.grado_afectacion}
+                </span>
+              )}
+            </div>
+          )}
         {/* Clima usado internamente — solo confirmación discreta */}
         {weather && (
           <p className="text-white/50 text-xs mt-3">
@@ -574,6 +597,21 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
         {/* 1) Detección + causas + prevención (didáctico) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
           <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">1) 🕵️ Detección, causas y prevención</p>
+          {resultado.tiene_problema && (resultado.grado_afectacion || resultado.porcentaje_severidad > 0) && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {resultado.porcentaje_severidad > 0 && (
+                <div className="flex items-center gap-1.5 bg-orange-50 rounded-xl px-3 py-2">
+                  <span className="text-sm font-bold text-orange-600">{resultado.porcentaje_severidad}%</span>
+                  <span className="text-xs text-orange-500">severidad</span>
+                </div>
+              )}
+              {resultado.grado_afectacion && (
+                <div className="bg-blue-50 rounded-xl px-3 py-2">
+                  <span className="text-xs text-blue-700">{resultado.grado_afectacion}</span>
+                </div>
+              )}
+            </div>
+          )}
           {resultado.que_tiene && (
             <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_tiene}</p>
           )}
