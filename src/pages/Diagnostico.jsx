@@ -72,6 +72,7 @@ export default function Diagnostico({ onPlagaDetectada }) {
   const ubicacionInputRef = useRef(null);
   const [pedirUbicacion, setPedirUbicacion] = useState(false);
   const [mostrarSelectorUbicacion, setMostrarSelectorUbicacion] = useState(false);
+  const [leyendoSeccion, setLeyendoSeccion] = useState(null);
 
   const ubicacionEfectiva = (ubicacion || user?.ubicacion || '').trim();
 
@@ -291,6 +292,46 @@ Responde SOLO con este JSON (sin markdown):
     window.speechSynthesis.speak(u);
   };
   const detenerVoz = () => { window.speechSynthesis?.cancel(); setLeyendo(false); };
+
+  const leerSeccion = (seccion) => {
+    if (!('speechSynthesis' in window)) return;
+    if (leyendoSeccion === seccion) {
+      window.speechSynthesis.cancel();
+      setLeyendoSeccion(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    let texto = '';
+    if (seccion === 'deteccion') {
+      texto = `Sección uno. Detección, causas y prevención. `;
+      if (resultado.grado_afectacion) texto += `Grado de afectación: ${resultado.grado_afectacion}. `;
+      if (resultado.porcentaje_severidad > 0) texto += `Porcentaje de severidad: ${resultado.porcentaje_severidad} por ciento. `;
+      if (resultado.que_tiene) texto += resultado.que_tiene + ' ';
+      if (resultado.causa) texto += `Causas probables: ${resultado.causa}. `;
+      if (resultado.prevencion) texto += `Prevención: ${resultado.prevencion}. `;
+    } else if (seccion === 'soluciones') {
+      texto = `Sección dos. Soluciones y métodos. `;
+      if (resultado.que_hacer) texto += resultado.que_hacer + ' ';
+      if (resultado.cuando_aplicar) texto += `Cuándo aplicar: ${resultado.cuando_aplicar}. `;
+      if (resultado.aplicacion_inmediata) texto += `Acción inmediata: ${resultado.aplicacion_inmediata}. `;
+    } else if (seccion === 'productos') {
+      texto = `Sección tres. Productos recomendados. `;
+      if (resultado.productos?.length) {
+        resultado.productos.forEach((p, i) => {
+          texto += `Opción ${i + 1}: ${p.nombre}. `;
+          if (p.dosis) texto += `Dosis: ${p.dosis}. `;
+          if (p.frecuencia) texto += `Frecuencia: ${p.frecuencia}. `;
+          if (p.carencia) texto += `Carencia: ${p.carencia}. `;
+        });
+      }
+    }
+    const u = new SpeechSynthesisUtterance(texto);
+    u.lang = 'es-PE'; u.rate = 0.9;
+    setLeyendoSeccion(seccion);
+    u.onend = () => setLeyendoSeccion(null);
+    u.onerror = () => setLeyendoSeccion(null);
+    window.speechSynthesis.speak(u);
+  };
 
   // ── Grabar voz para la consulta principal ────────────────────────────────────
   const grabarVozConsulta = () => {
@@ -596,7 +637,18 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
 
         {/* 1) Detección + causas + prevención (didáctico) */}
         <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">1) 🕵️ Detección, causas y prevención</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">1) 🕵️ Detección, causas y prevención</p>
+            <button onClick={() => leerSeccion('deteccion')}
+              className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                leyendoSeccion === 'deteccion'
+                  ? 'bg-red-100 text-red-600'
+                  : 'bg-primary/10 text-primary hover:bg-primary/20'
+              }`}>
+              {leyendoSeccion === 'deteccion' ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              {leyendoSeccion === 'deteccion' ? 'Detener' : 'Escuchar'}
+            </button>
+          </div>
           {resultado.tiene_problema && (resultado.grado_afectacion || resultado.porcentaje_severidad > 0) && (
             <div className="flex flex-wrap gap-2 mb-3">
               {resultado.porcentaje_severidad > 0 && (
@@ -636,7 +688,18 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
         {/* 2) Soluciones y métodos */}
         {resultado.tiene_problema && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">2) 🛠️ Soluciones y métodos</p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">2) 🛠️ Soluciones y métodos</p>
+              <button onClick={() => leerSeccion('soluciones')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  leyendoSeccion === 'soluciones'
+                    ? 'bg-red-100 text-red-600'
+                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                }`}>
+                {leyendoSeccion === 'soluciones' ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                {leyendoSeccion === 'soluciones' ? 'Detener' : 'Escuchar'}
+              </button>
+            </div>
             {resultado.que_hacer ? (
               <p className="text-gray-700 text-sm leading-relaxed">{resultado.que_hacer}</p>
             ) : (
@@ -661,8 +724,19 @@ Responde breve (máx 4 oraciones) con recomendaciones prácticas ajustadas al cl
         {resultado.productos?.length > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">3) 💊 Productos recomendados y modo de uso</p>
-              <span className="text-xs text-gray-400">{resultado.productos.length} opciones</span>
+              <div className="flex items-center gap-2">
+                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">3) 💊 Productos recomendados y modo de uso</p>
+                <span className="text-xs text-gray-400">{resultado.productos.length} opciones</span>
+              </div>
+              <button onClick={() => leerSeccion('productos')}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  leyendoSeccion === 'productos'
+                    ? 'bg-red-100 text-red-600'
+                    : 'bg-primary/10 text-primary hover:bg-primary/20'
+                }`}>
+                {leyendoSeccion === 'productos' ? <VolumeX size={14} /> : <Volume2 size={14} />}
+                {leyendoSeccion === 'productos' ? 'Detener' : 'Escuchar'}
+              </button>
             </div>
             <div className="space-y-3">
               {resultado.productos.map((p, i) => (
