@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/*.png'],
+      includeAssets: ['icons/*.png', 'screenshots/*.png'],
       manifest: {
         name: 'Agrilux - Agricultura Inteligente',
         short_name: 'Agrilux',
@@ -31,7 +31,21 @@ export default defineConfig({
             src: 'icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'any'
+          },
+          {
+            src: 'icons/icon-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ],
+        screenshots: [
+          {
+            src: 'screenshots/screenshot-mobile.png',
+            sizes: '390x844',
+            type: 'image/png',
+            form_factor: 'narrow'
           }
         ]
       },
