@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Camera, ShieldCheck, LogOut, Menu, X, MapPin, Download } from 'lucide-react';
+import { Camera, ShieldCheck, LogOut, Menu, X, MapPin, Download, ChevronRight } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import SelectorUbicacion from './SelectorUbicacion';
 import { useInstallPrompt } from './InstallPrompt';
@@ -17,6 +17,7 @@ export default function Layout({ children }) {
   const { isInstallable, triggerInstall } = useInstallPrompt();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mostrarUbicacion, setMostrarUbicacion] = useState(false);
+  const [mostrarInstalacion, setMostrarInstalacion] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -57,18 +58,10 @@ export default function Layout({ children }) {
                 onClick={async () => {
                   setMenuOpen(false);
                   if (isInstallable) {
-                    await triggerInstall();
+                    const accepted = await triggerInstall();
+                    if (!accepted) setMostrarInstalacion(true);
                   } else {
-                    // Manual instructions
-                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                    const isAndroid = /Android/.test(navigator.userAgent);
-                    if (isIOS) {
-                      alert('Para instalar en iPhone:\n\n1. Toca el botón de compartir (📤) en Safari\n2. Selecciona "Agregar a pantalla de inicio"\n3. Toca "Agregar"\n\n¡Listo! Aparecerá en tu pantalla de inicio.');
-                    } else if (isAndroid) {
-                      alert('Para instalar en Android:\n\n1. Abre Chrome y ve a agrilux.com\n2. Toca los tres puntos (⋮) arriba a la derecha\n3. Selecciona "Instalar aplicación"\n4. Confirma tocando "Instalar"\n\n¡Listo! Aparecerá en tu pantalla de inicio.');
-                    } else {
-                      alert('Para instalar:\n\n1. Busca la opción "Instalar aplicación" o "Agregar a pantalla de inicio" en tu navegador\n2. Sigue las instrucciones en pantalla');
-                    }
+                    setMostrarInstalacion(true);
                   }
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors text-sm font-medium rounded-lg">
@@ -106,6 +99,69 @@ export default function Layout({ children }) {
         <div className="fixed inset-0 z-50 bg-white/95 flex items-center justify-center" style={{ backdropFilter: 'blur(4px)' }}>
           <div className="w-full max-w-[430px] mx-auto relative">
             <SelectorUbicacion esPrimeraVez={false} onClose={() => setMostrarUbicacion(false)} />
+          </div>
+        </div>
+      )}
+
+      {mostrarInstalacion && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-end justify-center" style={{ backdropFilter: 'blur(4px)' }}>
+          <div className="w-full max-w-[430px] bg-white rounded-t-3xl p-6 pb-8">
+            <button onClick={() => setMostrarInstalacion(false)}
+              className="w-10 h-1 bg-gray-200 rounded-full mx-auto block mb-4" />
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-lg">
+                <span className="text-3xl">🌾</span>
+              </div>
+              <h3 className="text-lg font-display font-bold text-gray-900">Instalar Agrilux</h3>
+              <p className="text-sm text-gray-500 mt-1">Sigue estos pasos en tu celular</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-primary">1</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Abre Chrome en tu celular</p>
+                  <p className="text-xs text-gray-500">Ve a tu sitio de Agrilux desde Chrome</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-primary">2</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Toca los tres puntos (⋮)</p>
+                  <p className="text-xs text-gray-500">Esquina superior derecha del navegador</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-primary">3</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Selecciona "Instalar aplicación"</p>
+                  <p className="text-xs text-gray-500">También puede decir "Agregar a pantalla de inicio"</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-primary">4</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">Confirma "Instalar"</p>
+                  <p className="text-xs text-gray-500">Agrilux aparecerá en tu pantalla de inicio</p>
+                </div>
+              </div>
+            </div>
+
+            <button onClick={() => setMostrarInstalacion(false)}
+              className="w-full mt-6 bg-primary text-white font-bold py-3.5 rounded-2xl text-sm shadow-lg">
+              Entendido
+            </button>
           </div>
         </div>
       )}
