@@ -53,14 +53,28 @@ export default function Layout({ children }) {
                 <MapPin size={18} />
                 Cambiar ubicación
               </button>
-              {isInstallable && (
-                <button
-                  onClick={async () => { setMenuOpen(false); await triggerInstall(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors text-sm font-medium rounded-lg">
-                  <Download size={18} />
-                  Instalar app
-                </button>
-              )}
+              <button
+                onClick={async () => {
+                  setMenuOpen(false);
+                  if (isInstallable) {
+                    await triggerInstall();
+                  } else {
+                    // Manual instructions
+                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                    const isAndroid = /Android/.test(navigator.userAgent);
+                    if (isIOS) {
+                      alert('Para instalar en iPhone:\n\n1. Toca el botón de compartir (📤) en Safari\n2. Selecciona "Agregar a pantalla de inicio"\n3. Toca "Agregar"\n\n¡Listo! Aparecerá en tu pantalla de inicio.');
+                    } else if (isAndroid) {
+                      alert('Para instalar en Android:\n\n1. Abre Chrome y ve a agrilux.com\n2. Toca los tres puntos (⋮) arriba a la derecha\n3. Selecciona "Instalar aplicación"\n4. Confirma tocando "Instalar"\n\n¡Listo! Aparecerá en tu pantalla de inicio.');
+                    } else {
+                      alert('Para instalar:\n\n1. Busca la opción "Instalar aplicación" o "Agregar a pantalla de inicio" en tu navegador\n2. Sigue las instrucciones en pantalla');
+                    }
+                  }
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors text-sm font-medium rounded-lg">
+                <Download size={18} />
+                Descargar app
+              </button>
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-medium rounded-lg">
