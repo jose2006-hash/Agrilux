@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Camera, ShieldCheck, LogOut, Menu, X, MapPin } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import SelectorUbicacion from './SelectorUbicacion';
+import InstallPrompt from './InstallPrompt';
 
 const navItems = [
   { path: '/',        icon: Camera,      label: 'Diagnóstico' },
@@ -85,6 +86,8 @@ export default function Layout({ children }) {
           </div>
         </div>
       )}
+
+      <InstallPrompt />
     </div>
   );
 }
