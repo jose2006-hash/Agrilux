@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Camera, ShieldCheck, LogOut, Menu, X, MapPin } from 'lucide-react';
+import { Camera, ShieldCheck, LogOut, Menu, X, MapPin, Download } from 'lucide-react';
 import { useAuth } from '../lib/AuthContext';
 import SelectorUbicacion from './SelectorUbicacion';
-import InstallPrompt from './InstallPrompt';
+import { useInstallPrompt } from './InstallPrompt';
 
 const navItems = [
   { path: '/',        icon: Camera,      label: 'Diagnóstico' },
@@ -14,6 +14,7 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { isInstallable, triggerInstall } = useInstallPrompt();
   const [menuOpen, setMenuOpen] = useState(false);
   const [mostrarUbicacion, setMostrarUbicacion] = useState(false);
 
@@ -52,6 +53,14 @@ export default function Layout({ children }) {
                 <MapPin size={18} />
                 Cambiar ubicación
               </button>
+              {isInstallable && (
+                <button
+                  onClick={async () => { setMenuOpen(false); await triggerInstall(); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-primary/5 hover:text-primary transition-colors text-sm font-medium rounded-lg">
+                  <Download size={18} />
+                  Instalar app
+                </button>
+              )}
               <button
                 onClick={handleLogout}
                 className="w-full flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors text-sm font-medium rounded-lg">
@@ -86,8 +95,6 @@ export default function Layout({ children }) {
           </div>
         </div>
       )}
-
-      <InstallPrompt />
     </div>
   );
 }

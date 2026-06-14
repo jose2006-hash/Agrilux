@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import Layout from './components/Layout';
 import SelectorUbicacion from './components/SelectorUbicacion';
+import { InstallPromptProvider } from './components/InstallPrompt';
 import Registro from './pages/Registro';
 import Diagnostico from './pages/Diagnostico';
 import Mercado from './pages/Mercado';
@@ -54,9 +55,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <InstallPromptProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </InstallPromptProvider>
     </AuthProvider>
   );
 }
