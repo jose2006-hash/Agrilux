@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { Download, X, Smartphone } from 'lucide-react';
+import { Download, X, Smartphone, ExternalLink } from 'lucide-react';
 
 const InstallContext = createContext();
 
@@ -21,8 +21,7 @@ export function InstallPromptProvider({ children }) {
       e.preventDefault();
       setDeferredPrompt(e);
       setIsInstallable(true);
-      // Show banner after 5 seconds
-      setTimeout(() => setShowBanner(true), 5000);
+      setTimeout(() => setShowBanner(true), 3000);
     };
 
     const installedHandler = () => {
@@ -34,9 +33,7 @@ export function InstallPromptProvider({ children }) {
     window.addEventListener('beforeinstallprompt', handler);
     window.addEventListener('appinstalled', installedHandler);
 
-    // Detect if already installed (standalone mode)
     if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-      setIsInstallable(false);
       return;
     }
 
