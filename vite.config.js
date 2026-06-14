@@ -13,6 +13,7 @@ export default defineConfig({
         name: 'Agrilux - Agricultura Inteligente',
         short_name: 'Agrilux',
         description: 'Diagnóstico de plagas con IA para agricultores peruanos',
+        lang: 'es',
         theme_color: '#1a6b3c',
         background_color: '#ffffff',
         display: 'standalone',
@@ -30,13 +31,7 @@ export default defineConfig({
             src: 'icons/icon-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any'
-          },
-          {
-            src: 'icons/icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'maskable'
+            purpose: 'any maskable'
           }
         ]
       },

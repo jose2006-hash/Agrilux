@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { Download, X, Smartphone, ExternalLink } from 'lucide-react';
+import { Download, X, Smartphone } from 'lucide-react';
 
 const InstallContext = createContext();
 
@@ -14,6 +14,14 @@ export function InstallPromptProvider({ children }) {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    // Si ya está instalada como standalone, no mostrar nada
+    if (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      window.navigator.standalone
+    ) {
+      return;
+    }
+
     const dismissedFlag = localStorage.getItem('agrilux_install_dismissed');
     if (dismissedFlag) return;
 
@@ -28,14 +36,12 @@ export function InstallPromptProvider({ children }) {
       setShowBanner(false);
       setDeferredPrompt(null);
       setIsInstallable(false);
+      // Limpiar el flag cuando se instala correctamente
+      localStorage.removeItem('agrilux_install_dismissed');
     };
 
     window.addEventListener('beforeinstallprompt', handler);
     window.addEventListener('appinstalled', installedHandler);
-
-    if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
-      return;
-    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
@@ -49,6 +55,9 @@ export function InstallPromptProvider({ children }) {
     const { outcome } = await deferredPrompt.userChoice;
     setDeferredPrompt(null);
     setShowBanner(false);
+    if (outcome === 'accepted') {
+      localStorage.removeItem('agrilux_install_dismissed');
+    }
     return outcome === 'accepted';
   };
 
@@ -63,9 +72,11 @@ export function InstallPromptProvider({ children }) {
       {children}
       {showBanner && !dismissed && (
         <div className="fixed bottom-20 left-1/2 -translate-x-1/2 w-full max-w-[400px] z-50 px-4">
-          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4">
-            <button onClick={dismissBanner}
-              className="absolute top-3 right-3 p-1 hover:bg-gray-100 rounded-lg transition-colors">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 p-4 relative">
+            <button
+              onClick={dismissBanner}
+              className="absolute top-3 right-3 p-1 hover:bg-gray-100 rounded-lg transition-colors"
+            >
               <X size={16} className="text-gray-400" />
             </button>
             <div className="flex items-start gap-3">
@@ -78,13 +89,17 @@ export function InstallPromptProvider({ children }) {
                   Instálala en tu celular para diagnósticos más rápidos y uso sin internet
                 </p>
                 <div className="flex gap-2 mt-3">
-                  <button onClick={triggerInstall}
-                    className="flex items-center gap-1.5 bg-primary text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-primary-dark transition-colors">
+                  <button
+                    onClick={triggerInstall}
+                    className="flex items-center gap-1.5 bg-primary text-white text-xs font-bold px-4 py-2 rounded-xl hover:bg-primary-dark transition-colors"
+                  >
                     <Download size={14} />
                     Instalar ahora
                   </button>
-                  <button onClick={dismissBanner}
-                    className="text-gray-400 text-xs font-medium px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
+                  <button
+                    onClick={dismissBanner}
+                    className="text-gray-400 text-xs font-medium px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
                     Ahora no
                   </button>
                 </div>
