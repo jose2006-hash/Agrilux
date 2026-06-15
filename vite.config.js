@@ -43,7 +43,7 @@ export default defineConfig({
         screenshots: [
           {
             src: 'screenshots/screenshot-mobile.png',
-            sizes: '390x844',
+            sizes: '367x797',
             type: 'image/png',
             form_factor: 'narrow'
           }
