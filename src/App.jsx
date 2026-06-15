@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './lib/AuthContext';
 import Layout from './components/Layout';
 import SelectorUbicacion from './components/SelectorUbicacion';
 import { InstallPromptProvider } from './components/InstallPrompt';
+import InstallScreen from './components/InstallScreen';
 import Registro from './pages/Registro';
 import Diagnostico from './pages/Diagnostico';
 import Mercado from './pages/Mercado';
@@ -24,19 +25,14 @@ function AppRoutes() {
     </div>
   );
 
-  // Primera vez: mostrar selector de ubicación si no tiene ubicación guardada
   if (user && !user.ubicacion) {
-    return (
-      <SelectorUbicacion esPrimeraVez={true} />
-    );
+    return <SelectorUbicacion esPrimeraVez={true} />;
   }
 
   return (
     <Routes>
-      {/* Admin — ruta independiente, no usa Layout ni requiere sesión Firebase */}
       <Route path="/admin" element={<Admin />} />
 
-      {/* App principal */}
       <Route path="*" element={
         !user ? <Registro /> : (
           <Layout>
@@ -53,6 +49,17 @@ function AppRoutes() {
 }
 
 export default function App() {
+  const isInstalled =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone;
+  const wasSkipped = localStorage.getItem('agrilux_install_dismissed');
+
+  const [showInstall, setShowInstall] = useState(!isInstalled && !wasSkipped);
+
+  if (showInstall) {
+    return <InstallScreen onContinue={() => setShowInstall(false)} />;
+  }
+
   return (
     <AuthProvider>
       <InstallPromptProvider>
